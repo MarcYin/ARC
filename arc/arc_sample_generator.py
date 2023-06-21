@@ -7,7 +7,7 @@ from scipy.optimize import least_squares
 from scipy.stats import qmc
 
 from tqdm import tqdm
-from .NN_predict_jax import predict
+
 
 from typing import List, Tuple, Union, Dict, Any
 
@@ -298,7 +298,7 @@ def predict_input_slices(inp_slices: List[np.ndarray], model_weights: List[np.nd
     Returns:
         List[np.ndarray]: List of model prediction results.
     """
-
+    from .NN_predict_jax import predict
     
     predictions = []
     for inp_slice in tqdm(inp_slices, desc="Predicting S2 reflectance", unit="slice"):
