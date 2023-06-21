@@ -6,6 +6,9 @@ from scipy.optimize import least_squares
 # from BSM_soil import BSM
 from scipy.stats import qmc
 
+from tqdm import tqdm
+from .NN_predict_jax import predict
+
 from typing import List, Tuple, Union, Dict, Any
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
@@ -295,8 +298,7 @@ def predict_input_slices(inp_slices: List[np.ndarray], model_weights: List[np.nd
     Returns:
         List[np.ndarray]: List of model prediction results.
     """
-    from tqdm import tqdm
-    from NN_predict_jax import predict
+
     
     predictions = []
     for inp_slice in tqdm(inp_slices, desc="Predicting S2 reflectance", unit="slice"):
