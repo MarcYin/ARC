@@ -203,10 +203,10 @@ def load_crop_model(crop_type: str) -> Dict[str, np.ndarray]:
     """
     # Map of crop types to file paths
     crop_models = {
-        'maize': data_dir + '/data/US_001.npz',
-        'soy': data_dir + '/data/US_005.npz',
-        'rice': data_dir + '/data/China_000.npz',
-        'wheat': data_dir + '/data/US_024.npz',
+        'maize': data_dir + '/US_001.npz',
+        'soy': data_dir + '/US_005.npz',
+        'rice': data_dir + '/China_000.npz',
+        'wheat': data_dir + '/US_024.npz',
     }
     crop_type = crop_type.lower()
     if crop_type not in crop_models:
@@ -598,7 +598,7 @@ def generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type):
     orig_bios = adjust_orig_bios(orig_bios, [100, 100, 10000, 10000, 100, 100, 1000])
 
     # Load the forward model weights
-    model_weights = load_model(data_dir + '/data/foward_prosail_model_weights.npz')
+    model_weights = load_model(data_dir + '/foward_prosail_model_weights.npz')
     
     # Split the inputs for batch processing
     inp_slices = np.array_split(np.atleast_2d(inp).T, 300)
