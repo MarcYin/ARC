@@ -1,0 +1,5 @@
+*.pytest_cache*
+*.pyc
+*__pycache__*
+arc.egg-info
+.DS_Store

@@ -1,0 +1,1 @@
+from .arch_sample_generator import generate_arch_s2_refs
