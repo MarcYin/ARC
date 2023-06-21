@@ -7,4 +7,7 @@ setup(
     author_email='ucfafyi@ucl.ac.uk',
     description='ARC python package',
     packages=find_packages(),
+    license = "GNU Affero General Public License v3.0",
+    include_package_data = True,
+
 )
