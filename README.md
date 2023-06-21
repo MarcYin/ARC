@@ -30,7 +30,7 @@ Define the necessary parameters:
 The generate_arc_s2_refs function generates reference samples for Sentinel-2 observations based on the specified parameters. It returns several arrays:
 
 - `s2_refs`: Reflectance spectra for different Sentinel-2 bands: 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12'.
-- `pheo_samples`: Pheophytin content samples.
+- `pheo_samples`: Phenology parameters samples.
 - `bio_samples`: Biophysical parameter scaling parameters.
 - `orig_bios`: Time series of biophysical parameter samples.
 - `soil_samples`: Soil parameter samples.
