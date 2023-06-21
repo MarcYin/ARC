@@ -611,7 +611,7 @@ def generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type):
 
 
 
-def generate_arch_s2_refs(doys: List[int], start_of_season: int, growth_season_length: int, num_samples: int, angs: List[float], crop_type: str) -> Tuple:
+def generate_arc_s2_refs(doys: List[int], start_of_season: int, growth_season_length: int, num_samples: int, angs: List[float], crop_type: str) -> Tuple:
     """
     Generates references for Sentinel-2 based on given parameters.
 
@@ -669,7 +669,7 @@ if __name__ == "__main__":
     crop_type = 'maize'
 
     # Generate reference samples
-    s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_arch_s2_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
+    s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_arc_s2_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
 
     max_lai = np.nanmax(orig_bios[4], axis=0)
     ndvi = (s2_refs[7] - s2_refs[3]) / (s2_refs[7] + s2_refs[3])
