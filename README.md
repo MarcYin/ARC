@@ -1,4 +1,4 @@
-# ⌒*Archetype*⌒
+# $⌒_⌣⌒$ *Archetypes*
 
 Feng Yin
 
