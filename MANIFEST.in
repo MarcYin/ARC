@@ -1,2 +1,2 @@
 include README.md
-recursive-include arch/data *
+recursive-include arc/data *
