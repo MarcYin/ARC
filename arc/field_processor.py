@@ -5,7 +5,7 @@ from arc.approximate_KNN_search import get_neighbours
 from arc.s2_data_reader import get_s2_official_data
 from arc.arc_sample_generator import generate_arc_refs
 
-def arc_field(s2_start_date, s2_end_date, s2_dir, geojson_path, start_of_season,
+def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
               crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False):
     """
     Performs the ARC Field pipeline which includes reading satellite data, generating samples, searching for neighbours,
@@ -13,13 +13,13 @@ def arc_field(s2_start_date, s2_end_date, s2_dir, geojson_path, start_of_season,
     
     Args:
         s2_start_date, s2_end_date : Strings representing the start and end dates for the satellite data.
-        s2_dir : Directory where satellite data is stored.
         geojson_path : Path to the GeoJSON file.
         start_of_season : Start date of the growth season.
         crop_type : Type of the crop.
         output_file_path : File path to save the resulting data.
         num_samples : Number of samples to generate (default is 1,000,000).
         growth_season_length : Length of the growth season (default is 45).
+        S2_data_folder : Directory where satellite data is stored.
         
     Returns:
         None. The results are saved to the output_file_path.
@@ -92,7 +92,6 @@ if __name__ == "__main__":
     scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc_field(
         start_date, 
         end_date, 
-        str(S2_data_folder), 
         geojson_path, 
         START_OF_SEASON, 
         CROP_TYPE, 

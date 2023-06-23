@@ -14,8 +14,7 @@ pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
 ```
 
 
-Example:
-
+## Generating archtype ensemnble
 
 Define the necessary parameters:
 
@@ -49,7 +48,7 @@ growth_season_length = 45
 crop_type = 'maize'
 
 # Generate reference samples
-s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = arc.generate_arc_s2_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
+s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = arc.generate_arc_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
 
 
 # Plot the relationship between maximum NDVI and maximum LAI:
@@ -64,4 +63,121 @@ plt.plot(max_ndvi, max_lai/100, 'o', ms=5, alpha=0.1)
 plt.xlabel('Max NDVI')
 plt.ylabel('Max LAI (m$^2$/m$^2$)')
 plt.show()
+```
+
+## Testing archetype solver 
+
+This package contains a function to solve the biophysical parameters with time series of Sentinel-2 (S2) observations. The S2 surface reflectance is downloaded from GEE with an assumed uncertainty of 10%. 
+
+The function `arc_field` takes the following parameters:
+
+- `start_date`: The starting date of the S2 observations.
+- `end_date`: The ending date of the S2 observations.
+- `geojson_path`: The path to the GeoJSON file containing the field boundary.
+- `start_of_season`: The day of year (DOY) of the start of the crop growth season.
+- `crop_type`: The type of crop for which to generate the reference samples. For example, 'maize'.
+- `output_file_path`: The path for saving the output file.
+- `num_samples`: The number of reflectance samples to generate.
+- `growth_season_length`: The length of the crop growth season in days.
+- `S2_data_folder`: The folder used to store S2 data.
+
+And returns the following:
+- `scale_data`: The scaling parameters used to scale the archetypes.
+- `post_bio_tensor`: The posterior biophysical parameters tensor.
+- `post_bio_unc_tensor`: The posterior biophysical parameters uncertainty tensor.
+- `mask`: The mask of the field boundary for the tensor.
+- `doys`: The DOYs of the S2 observations.
+
+The shape of `post_bio_tensor` should be (number_doys, 7, number_valid_pixels), where 7 is the number of biophysical parameters (`N, cab, cm, cw, lai, ala, cbrown`). The shape of `post_bio_unc_tensor` should be (number_doys, 7, number_valid_pixels, 7), where 7 is the number of biophysical parameters. 
+
+`post_bio_tensor` table with scales:
+
+| Index | Parameter | Scale |
+| --- | --- | --- |
+| 0 | N | 1/100. |
+| 1 | cab | 1/100. |
+| 2 | cm | 1/10000. |
+| 3 | cw | 1/10000. |
+| 4 | lai | 1/100. |
+| 5 | ala | 1/100. |
+| 6 | cbrown | 1/1000. |
+|||
+
+Full example:
+
+```python
+import arc
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
+import os
+
+# Constants
+START_OF_SEASON = 225
+CROP_TYPE = 'wheat'
+NUM_SAMPLES = 100000
+GROWTH_SEASON_LENGTH = 45
+LAZY_EVALUATION_STEP = 100
+ALPHA = 0.8
+LINE_WIDTH = 2
+start_date="2022-07-15"
+end_date="2022-11-30"
+
+def main():
+    """Main function to execute the Arc field processing and plotting"""
+    
+    arc_dir = os.path.dirname(os.path.realpath(arc.__file__))
+    geojson_path = f"{arc_dir}/test_data/SF_field.geojson"
+    S2_data_folder = Path.home() / f"Downloads/{Path(geojson_path).stem}"
+    S2_data_folder.mkdir(parents=True, exist_ok=True)
+    
+    scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+        start_date, 
+        end_date, 
+        str(S2_data_folder), 
+        geojson_path, 
+        START_OF_SEASON, 
+        CROP_TYPE, 
+        f'{S2_data_folder}/SF_field.npz', 
+        NUM_SAMPLES, 
+        GROWTH_SEASON_LENGTH, 
+        str(S2_data_folder),
+        plot=True
+    )
+
+    plot_lai_over_time(doys, post_bio_tensor)
+    plot_lai_maps(doys, post_bio_tensor, mask)
+
+def plot_lai_over_time(doys: np.array, post_bio_tensor: np.array):
+    """Plot LAI over time"""
+    
+    plt.figure(figsize=(12, 6))
+    plt.plot(doys, post_bio_tensor[::LAZY_EVALUATION_STEP, 4,].T / 100, '-',  lw=LINE_WIDTH, alpha=ALPHA)
+    plt.ylabel('LAI (m2/m2)')
+    plt.xlabel('Day of year')
+    plt.show()
+
+def plot_lai_maps(doys: np.array, post_bio_tensor: np.array, mask: np.array):
+    """Plot LAI maps"""
+    
+    lai = post_bio_tensor[:, 4].T / 100
+    nrows = int(len(doys) / 5) + int(len(doys) % 5 > 0)
+    fig, axs = plt.subplots(ncols=5, nrows=nrows, figsize=(20, 4*nrows))
+    axs = axs.ravel()
+
+    for i in range(len(doys)):
+        lai_map = np.zeros(mask.shape) * np.nan
+        lai_map[~mask] = lai[i]
+        im = axs[i].imshow(lai_map, vmin=0, vmax=7)
+        fig.colorbar(im, ax=axs[i], shrink=0.8, label='LAI (m2/m2)')
+        axs[i].set_title('DOY: %d' % doys[i])
+    
+    # remove empty plots
+    for i in range(len(doys), len(axs)):
+        axs[i].axis('off')
+    plt.show()
+
+if __name__ == "__main__":
+    main()
+
 ```
