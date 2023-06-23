@@ -7,7 +7,7 @@ if __name__ == "__main__":
     from pathlib import Path
     import os
     
-    arc_dir = os.path.dirname(os.path.realpath(__file__))
+    arc_dir = os.path.dirname(os.path.realpath(arc.__file__))
 
     # Constants
     START_OF_SEASON = 225
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     
     # gejson path is in the test_data folder
     
-    geojson_path = f"{arc_dir}/arc/test_data/SF_field.geojson"
+    geojson_path = f"{arc_dir}/test_data/SF_field.geojson"
     
     S2_data_folder = Path.home() / f"Downloads/{Path(geojson_path).stem}"
     S2_data_folder.mkdir(parents=True, exist_ok=True)
