@@ -5,6 +5,9 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
     from pathlib import Path
+    import os
+    
+    arc_dir = os.path.dirname(os.path.realpath(__file__))
 
     # Constants
     START_OF_SEASON = 225
@@ -12,10 +15,13 @@ if __name__ == "__main__":
     NUM_SAMPLES = 100000
     GROWTH_SEASON_LENGTH = 45
     
-
+    
     start_date = "2022-07-15"
     end_date = "2022-11-30"
-    geojson_path = "arc/test_data/SF_field.geojson"
+    
+    # gejson path is in the test_data folder
+    
+    geojson_path = f"{arc_dir}/arc/test_data/SF_field.geojson"
     
     S2_data_folder = Path.home() / f"Downloads/{Path(geojson_path).stem}"
     S2_data_folder.mkdir(parents=True, exist_ok=True)
@@ -57,3 +63,4 @@ if __name__ == "__main__":
     for i in range(len(doys), len(axs)):
         axs[i].axis('off')
     plt.show()
+
