@@ -130,7 +130,7 @@ Successfully saved authorization token.
 
 5. You can now exit the shell and stop the container by typing `exit` in the terminal. 
    
-6. You can now run the following command to test the solver
+6. You can now run the following command to test the solver over one [South African field](https://github.com/MarcYin/ARC/blob/main/arc/test_data/SF_field.geojson):
 
 
 ```python
