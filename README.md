@@ -14,7 +14,7 @@ pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
 ```
 
 
-## Generating archtype ensemnble
+## Generating archtype ensemble
 
 Define the necessary parameters:
 
