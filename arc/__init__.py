@@ -1,2 +1,2 @@
-from .arc_sample_generator import generate_arc_s2_refs
+from .arc_sample_generator import generate_arc_refs
 from .field_processor import arc_field
