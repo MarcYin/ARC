@@ -1,9 +1,9 @@
 import numpy as np
-from arc_util import save_data
-from assimilate_jax import assimilate
-from approximate_KNN_search import get_neighbours
-from s2_data_reader import get_s2_official_data
-from arc_sample_generator import generate_arc_refs
+from arc.arc_util import save_data
+from arc.assimilate_jax import assimilate
+from arc.approximate_KNN_search import get_neighbours
+from arc.s2_data_reader import get_s2_official_data
+from arc.arc_sample_generator import generate_arc_refs
 
 def arc_field(s2_start_date, s2_end_date, s2_dir, geojson_path, start_of_season,
               crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False):
