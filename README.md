@@ -103,7 +103,35 @@ The shape of `post_bio_tensor` should be (number_doys, 7, number_valid_pixels), 
 | 6 | cbrown | 1/1000. |
 |||
 
-Full example:
+### Full example:
+
+
+#### ⚠️⚠️⚠️ Google Earth Engine authentication before using ARC
+
+1. Create a Google Earth Engine account and sign in to [Google Earth Engine](https://earthengine.google.com/).
+ 
+2. You can run the following command to set up the Google Earth Engine authentication:
+
+```bash
+earthengine authenticate --auth_mode=notebook
+```
+You should see the following message in the terminal:
+```console
+To authorize access needed by Earth Engine, open the following URL in a web browser and follow the instructions. If the web browser does not start automatically, please manually browse the URL below.
+        https://code.earthengine.google.com/client-auth?scopes=https...
+The authorization workflow will generate a code, which you should paste in the box below.
+Enter verification code:
+```
+
+4. Copy the URL to your browser and sign in to your Google Earth Engine account. You will be given a verification code. Copy the verification code and paste it into the terminal. You should see the following message:
+```bash
+Successfully saved authorization token.
+```
+
+5. You can now exit the shell and stop the container by typing `exit` in the terminal. 
+   
+6. You can now run the following command to test the solver
+
 
 ```python
 import arc
