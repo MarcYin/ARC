@@ -1,5 +1,4 @@
 import os
-import sys
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import least_squares
@@ -298,7 +297,7 @@ def predict_input_slices(inp_slices: List[np.ndarray], model_weights: List[np.nd
     Returns:
         List[np.ndarray]: List of model prediction results.
     """
-    from .NN_predict_jax import predict
+    from NN_predict_jax import predict
     
     predictions = []
     for inp_slice in tqdm(inp_slices, desc="Predicting S2 reflectance", unit="slice"):
@@ -608,16 +607,16 @@ def generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type):
     del inp
 
     # Use the forward model to generate the reference spectra
-    s2_refs = predict_input_slices(inp_slices, model_weights)
+    arc_refs = predict_input_slices(inp_slices, model_weights)
 
     # Reshape the output
-    s2_refs = s2_refs.reshape(10, len(doys), num_samples)
+    arc_refs = arc_refs.reshape(10, len(doys), num_samples)
 
-    return s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples
+    return arc_refs, pheo_samples, bio_samples, orig_bios, soil_samples
 
 
 
-def generate_arc_s2_refs(doys: List[int], start_of_season: int, growth_season_length: int, num_samples: int, angs: List[float], crop_type: str) -> Tuple:
+def generate_arc_refs(doys: List[int], start_of_season: int, growth_season_length: int, num_samples: int, angs: List[float], crop_type: str) -> Tuple:
     """
     Generates references for Sentinel-2 based on given parameters.
 
@@ -659,9 +658,9 @@ def generate_arc_s2_refs(doys: List[int], start_of_season: int, growth_season_le
     p_maxs = [values['max'] for values in parameters.values()]
 
     # Generate reference samples
-    s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type)
+    arc_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type)
     
-    return s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples
+    return arc_refs, pheo_samples, bio_samples, orig_bios, soil_samples
 
 
 if __name__ == "__main__":
@@ -675,10 +674,10 @@ if __name__ == "__main__":
     crop_type = 'maize'
 
     # Generate reference samples
-    s2_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_arc_s2_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
+    arc_refs, pheo_samples, bio_samples, orig_bios, soil_samples = generate_arc_refs(doys, start_of_season, growth_season_length, num_samples, angs, crop_type)
 
     max_lai = np.nanmax(orig_bios[4], axis=0)
-    ndvi = (s2_refs[7] - s2_refs[3]) / (s2_refs[7] + s2_refs[3])
+    ndvi = (arc_refs[7] - arc_refs[3]) / (arc_refs[7] + arc_refs[3])
     max_ndvi = np.nanmax(ndvi, axis=0)
     
     import matplotlib.pyplot as plt
