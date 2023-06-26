@@ -162,7 +162,6 @@ def main():
     scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
         start_date, 
         end_date, 
-        str(S2_data_folder), 
         geojson_path, 
         START_OF_SEASON, 
         CROP_TYPE, 
