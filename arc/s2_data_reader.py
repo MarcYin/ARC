@@ -84,7 +84,7 @@ def read_s2_official_data(file_names: list[str], geojson_path: str) -> tuple[np.
     Raises:
         IOError: An error occurred accessing the bigtable.Table object.
     """
-    s2_references = []
+    s2_reflectances = []
     for file_name in file_names:
         g = gdal.Warp('', file_name, format='MEM', cutlineDSName=geojson_path, cropToCutline=True, dstNodata=np.nan, outputType=gdal.GDT_Float32)
         
@@ -94,12 +94,12 @@ def read_s2_official_data(file_names: list[str], geojson_path: str) -> tuple[np.
         data = g.ReadAsArray()
         cloud = data[-1]
         data = np.where(cloud > 40, np.nan, data[:-1] / 10000.0)
-        s2_references.append(data)
+        s2_reflectances.append(data)
     
-    s2_references = np.array(s2_references)
-    s2_uncertainties = s2_references * 0.1
+    s2_reflectances = np.array(s2_reflectances)
+    s2_uncertainties = s2_reflectances * 0.1
     
-    return s2_references, s2_uncertainties
+    return s2_reflectances, s2_uncertainties
 
 def calculate_s2_angles(features: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """

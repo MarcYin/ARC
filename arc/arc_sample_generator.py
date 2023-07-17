@@ -206,9 +206,10 @@ def load_crop_model(crop_type: str) -> Dict[str, np.ndarray]:
     # Map of crop types to file paths
     crop_models = {
         'maize': data_dir + '/US_001.npz',
-        'soy': data_dir + '/US_005.npz',
+        'soybean': data_dir + '/US_005.npz',
         'rice': data_dir + '/China_000.npz',
         'wheat': data_dir + '/US_024.npz',
+        'potato': data_dir + '/US_Potatoes_model_para.npz',
     }
     crop_type = crop_type.lower()
     if crop_type not in crop_models:
