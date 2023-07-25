@@ -10,11 +10,19 @@ from osgeo import gdal
 from functools import partial
 from shapely.geometry import shape
 from concurrent.futures import ThreadPoolExecutor
+from arc.arc_util import ndvi_filter
+
+# from robust_smoothing import robust_smooth
+
 
 from typing import List, Tuple, Union, Any
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 ee.Initialize(opt_url = 'https://earthengine-highvolume.googleapis.com')
+
+
+
+
 
 def load_geojson(file_path: str):
     """
@@ -93,7 +101,8 @@ def read_s2_official_data(file_names: list[str], geojson_path: str) -> tuple[np.
         
         data = g.ReadAsArray()
         cloud = data[-1]
-        data = np.where(cloud > 40, np.nan, data[:-1] / 10000.0)
+        mask = (cloud > 40) | (data[0] > 3000)
+        data = np.where(mask, np.nan, data[:-1] / 10000.0)
         s2_reflectances.append(data)
     
     s2_reflectances = np.array(s2_reflectances)
@@ -345,7 +354,9 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str, S2_d
 
         # Read the S2 official data and get references and uncertainties
         s2_refs, s2_uncs = read_s2_official_data(filenames, geojson_path)
-        
+
+        s2_refs, s2_uncs, doys = ndvi_filter(s2_refs, s2_uncs, doys)
+
         # Get the mask and metadata from the first image
         mask, geotransform, crs = get_mask_and_metadata(filenames, s2_refs)
 
@@ -355,10 +366,40 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str, S2_d
         raise RuntimeError("An error occurred while retrieving Sentinel-2 official data.") from e
 
 
+def db_logistic(p, x):
+    v1, v2, v3, m0, n0, m1, n1 = p
+    ret = v1 + v2 / (1 + np.exp(-m0 * (x - n0))) - v3 / (1 + np.exp(-m1 * (x - n1)))
+    return ret
+
+def compute_difference(p: List[float], x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """
+    Computes the difference between a logistic function and provided y values.
+
+    Parameters:
+        p (List[float]): List of parameters for the logistic function.
+        x (np.ndarray): Input values for the logistic function.
+        y (np.ndarray): Target y values to compare with the logistic function's results.
+
+    Returns:
+        np.ndarray: Difference between the logistic function and y values. Any non-finite values are replaced with 0.
+    """
+
+    # Compute logistic function with given parameters and inputs
+    result = db_logistic(p, x)
+
+    # Calculate difference between logistic function results and target y values
+    difference = result - y
+
+    # Replace any non-finite values in the difference array with 0
+    difference[~np.isfinite(difference)] = 0
+
+    return difference
+
+
 def main():
-    start_date = "2022-07-15"
-    end_date = "2022-11-30"
-    geojson_path = "test_data/SF_field.geojson"
+    start_date = "2022-05-15"
+    end_date = "2022-10-15"
+    geojson_path = "test_data/anny_cuypers_achter_stal_geometry.geojson"
     S2_data_folder = os.path.join(os.path.expanduser('~'), 'Downloads/' + geojson_path.split('/')[-1].split('.')[0] + '/')
     if not os.path.exists(S2_data_folder):
         os.makedirs(S2_data_folder)

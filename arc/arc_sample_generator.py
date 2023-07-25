@@ -209,7 +209,7 @@ def load_crop_model(crop_type: str) -> Dict[str, np.ndarray]:
         'soybean': data_dir + '/US_005.npz',
         'rice': data_dir + '/China_000.npz',
         'wheat': data_dir + '/US_024.npz',
-        'potato': data_dir + '/US_Potatoes_model_para.npz',
+        # 'potato': data_dir + '/US_Potatoes_model_para.npz',
     }
     crop_type = crop_type.lower()
     if crop_type not in crop_models:
@@ -569,7 +569,7 @@ def generate_ref_samples(p_mins, p_maxs, num_samples, angs, doys, crop_type):
     """
     # Load the crop model
     crop_model = load_crop_model(crop_type)
-    deltas = crop_model['deltas']
+    # deltas = crop_model['deltas']
     medians = crop_model['meds']
 
     # Adjust the parameter ranges

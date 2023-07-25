@@ -75,17 +75,26 @@ if __name__ == "__main__":
     import numpy as np
     from pathlib import Path
 
+    # # Constants
+    # START_OF_SEASON = 225
+    # CROP_TYPE = 'wheat'
+    # NUM_SAMPLES = 100000
+    # GROWTH_SEASON_LENGTH = 45
+
+    # start_date = "2022-07-15"
+    # end_date = "2022-11-30"
+    # geojson_path = "test_data/SF_field.geojson"
+
     # Constants
-    START_OF_SEASON = 225
+    START_OF_SEASON = 170
     CROP_TYPE = 'wheat'
     NUM_SAMPLES = 100000
-    GROWTH_SEASON_LENGTH = 45
-    
+    GROWTH_SEASON_LENGTH = 60
 
-    start_date = "2022-07-15"
-    end_date = "2022-11-30"
-    geojson_path = "test_data/SF_field.geojson"
-    
+    start_date = "2022-05-15"
+    end_date = "2022-10-01"
+    geojson_path = "test_data/anny_cuypers_achter_stal_geometry.geojson"
+
     S2_data_folder = Path.home() / f"Downloads/{Path(geojson_path).stem}"
     S2_data_folder.mkdir(parents=True, exist_ok=True)
     

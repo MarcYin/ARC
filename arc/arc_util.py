@@ -1,4 +1,80 @@
 import numpy as np
+from arc.robust_smoothing import robust_smooth
+
+from typing import Tuple
+
+def calculate_ndvi(s2_refs: np.array) -> np.array:
+    """
+    Calculates the Normalized Difference Vegetation Index (NDVI) given an array of satellite image reflectances.
+
+    :param s2_refs: An array of satellite image reflectances.
+    :return: An array of NDVI values.
+    """
+    return (s2_refs[:, 7] - s2_refs[:, 2]) / (s2_refs[:, 7] + s2_refs[:, 2])
+
+def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array) -> Tuple[np.array, np.array, np.array]:
+    """
+    Filters and smooths NDVI values, removing non-vegetation pixels and smoothing over time.
+
+    :param s2_refs: An array of satellite image reflectances.
+    :param s2_uncs: An array of associated uncertainties.
+    :param doys: An array of day of year values.
+    :return: Transposed s2_refs, s2_uncs and doys arrays.
+    """
+    # Calculate NDVI
+    ndvi = calculate_ndvi(s2_refs)
+
+    # Ensure unique days of the year and corresponding indices
+    udoys, inds = np.unique(doys, return_index=True)
+
+    # Transpose references and uncertainties based on unique indices
+    s2_refs = s2_refs[inds].transpose(1, 0, 2, 3)
+    s2_uncs = s2_uncs[inds].transpose(1, 0, 2, 3)
+
+    # Adjust doys array based on unique indices
+    doys = doys[inds]
+
+    # Scale udoys to roughly have step of 1
+    udoys = udoys / np.diff(udoys).mean()
+
+    # Filter NDVI values and reshape to 1D
+    array = ndvi[inds].reshape(len(udoys), -1)
+    mask = array > 0
+
+    # Zero out non-vegetation pixels
+    array[~mask] = 0
+
+    # Smooth the array
+    sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
+
+    
+
+    # Further mask out non-smooth values
+    mask = w > 0.8
+
+    # Filter B8A values and reshape to 1D
+    array = s2_refs[7].reshape(len(udoys), -1)
+    mask = array > 0
+
+    # Zero out non-vegetation pixels
+    array[~mask] = 0
+
+    # Smooth the array
+    sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
+
+    # Further mask out non-smooth values
+    mask = mask & (w > 0.8)
+
+
+    # Reshape the mask to the shape of references
+    mask = mask.reshape(s2_refs.shape[1], s2_refs.shape[2], s2_refs.shape[3])
+
+    # Apply the mask to the references and uncertainties
+    s2_refs[:, ~mask] = np.nan
+    s2_uncs[:, ~mask] = np.nan
+
+    return s2_refs.transpose(1, 0, 2, 3), s2_uncs.transpose(1, 0, 2, 3), doys
+
 
 def save_data(file_path, post_bio_tensor, post_bio_unc_tensor, dat, geotransform, crs, mask, doys):
     """
