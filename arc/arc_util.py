@@ -12,14 +12,14 @@ def calculate_ndvi(s2_refs: np.array) -> np.array:
     """
     return (s2_refs[:, 7] - s2_refs[:, 2]) / (s2_refs[:, 7] + s2_refs[:, 2])
 
-def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array) -> Tuple[np.array, np.array, np.array]:
+def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array, s2_angles: np.array) -> Tuple[np.array, np.array, np.array]:
     """
     Filters and smooths NDVI values, removing non-vegetation pixels and smoothing over time.
 
     :param s2_refs: An array of satellite image reflectances.
     :param s2_uncs: An array of associated uncertainties.
     :param doys: An array of day of year values.
-    :return: Transposed s2_refs, s2_uncs and doys arrays.
+    :return: Transposed s2_refs, s2_uncs, doys and s2_angles arrays.
     """
     # Calculate NDVI
     ndvi = calculate_ndvi(s2_refs)
@@ -33,6 +33,8 @@ def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array) -> Tuple[n
 
     # Adjust doys array based on unique indices
     doys = doys[inds]
+
+    s2_angles = s2_angles[:, inds]
 
     # Scale udoys to roughly have step of 1
     udoys = udoys / np.diff(udoys).mean()
@@ -73,7 +75,7 @@ def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array) -> Tuple[n
     s2_refs[:, ~mask] = np.nan
     s2_uncs[:, ~mask] = np.nan
 
-    return s2_refs.transpose(1, 0, 2, 3), s2_uncs.transpose(1, 0, 2, 3), doys
+    return s2_refs.transpose(1, 0, 2, 3), s2_uncs.transpose(1, 0, 2, 3), doys, s2_angles
 
 
 def save_data(file_path, post_bio_tensor, post_bio_unc_tensor, dat, geotransform, crs, mask, doys):

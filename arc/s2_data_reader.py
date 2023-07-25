@@ -344,7 +344,7 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str, S2_d
 
         # Calculate S2 angles
         szas, vzas, raas = calculate_s2_angles(features)
-        s2_angles = [szas, vzas, raas]
+        s2_angles = np.array([szas, vzas, raas])
 
         # Get the day of the year (DOY) for each feature
         doys = get_doys(features)
@@ -355,7 +355,7 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str, S2_d
         # Read the S2 official data and get references and uncertainties
         s2_refs, s2_uncs = read_s2_official_data(filenames, geojson_path)
 
-        s2_refs, s2_uncs, doys = ndvi_filter(s2_refs, s2_uncs, doys)
+        s2_refs, s2_uncs, doys, s2_angles = ndvi_filter(s2_refs, s2_uncs, doys, s2_angles)
 
         # Get the mask and metadata from the first image
         mask, geotransform, crs = get_mask_and_metadata(filenames, s2_refs)
