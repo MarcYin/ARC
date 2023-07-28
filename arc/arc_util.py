@@ -21,11 +21,12 @@ def time_series_filter(array, udoys):
 
     # Smooth the array
     sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
-    diff = array - sarray
-    diff[~mask] = np.nan
+    # diff = array - sarray
+    # diff[~mask] = np.nan
 
-    diff_thresh = np.nanpercentile(abs(diff), 95, axis=0)
-    time_series_mask = (abs(diff) < diff_thresh[None])
+    # diff_thresh = np.nanpercentile(abs(diff), 90, axis=0)
+    # time_series_mask = (abs(diff) < diff_thresh[None])
+    time_series_mask = w > 0.5
     return time_series_mask
 
 

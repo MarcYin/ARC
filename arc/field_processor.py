@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # Constants
     START_OF_SEASON = 170
     CROP_TYPE = 'wheat'
-    NUM_SAMPLES = 100000
+    NUM_SAMPLES = 200000
     GROWTH_SEASON_LENGTH = 60
 
     start_date = "2022-05-15"

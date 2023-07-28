@@ -395,12 +395,14 @@ def compute_difference(p: List[float], x: np.ndarray, y: np.ndarray) -> np.ndarr
 
     return difference
 
+if __name__ == "__main__":
+    from pathlib import Path
+    start_date = "2018-06-01"
+    end_date = "2018-10-01"
+    geojson_path = "LMU_508_2018_maize.geojson"
+    geojson_path = Path.home() / f"Downloads/{geojson_path}"
 
-def main():
-    start_date = "2022-05-15"
-    end_date = "2022-10-15"
-    geojson_path = "test_data/anny_cuypers_achter_stal_geometry.geojson"
-    S2_data_folder = os.path.join(os.path.expanduser('~'), 'Downloads/' + geojson_path.split('/')[-1].split('.')[0] + '/')
+    S2_data_folder = os.path.join(os.path.expanduser('~'), 'Downloads/' + str(geojson_path).split('/')[-1].split('.')[0] + '/')
     if not os.path.exists(S2_data_folder):
         os.makedirs(S2_data_folder)
     s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs = get_s2_official_data(start_date, end_date, geojson_path, S2_data_folder=S2_data_folder)
@@ -421,6 +423,3 @@ def main():
     mask = np.isfinite(mean_ndvi)
     plt.plot(doys[mask], mean_ndvi[mask], '--o')
     plt.show()
-
-if __name__ == "__main__":
-    main()
