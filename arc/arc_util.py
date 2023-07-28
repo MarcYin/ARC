@@ -12,6 +12,23 @@ def calculate_ndvi(s2_refs: np.array) -> np.array:
     """
     return (s2_refs[:, 7] - s2_refs[:, 2]) / (s2_refs[:, 7] + s2_refs[:, 2])
 
+
+def time_series_filter(array, udoys):
+    mask = array > 0
+
+    # Zero out non-vegetation pixels
+    array[~mask] = 0
+
+    # Smooth the array
+    sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
+    diff = array - sarray
+    diff[~mask] = np.nan
+
+    diff_thresh = np.nanpercentile(abs(diff), 95, axis=0)
+    time_series_mask = (abs(diff) < diff_thresh[None])
+    return time_series_mask
+
+
 def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array, s2_angles: np.array) -> Tuple[np.array, np.array, np.array]:
     """
     Filters and smooths NDVI values, removing non-vegetation pixels and smoothing over time.
@@ -41,39 +58,21 @@ def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array, s2_angles:
 
     # Filter NDVI values and reshape to 1D
     array = ndvi[inds].reshape(len(udoys), -1)
-    mask = array > 0
-
-    # Zero out non-vegetation pixels
-    array[~mask] = 0
-
-    # Smooth the array
-    sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
-
-    
-
-    # Further mask out non-smooth values
-    mask = w > 0.8
+    time_series_mask1 = time_series_filter(array, udoys)
 
     # Filter B8A values and reshape to 1D
     array = s2_refs[7].reshape(len(udoys), -1)
-    mask = array > 0
+    time_series_mask2 = time_series_filter(array, udoys)
 
-    # Zero out non-vegetation pixels
-    array[~mask] = 0
+    array = s2_refs[2].reshape(len(udoys), -1)
+    time_series_mask3 = time_series_filter(array, udoys)
+    time_series_mask = time_series_mask1 & time_series_mask2 & time_series_mask3
 
-    # Smooth the array
-    sarray, w = robust_smooth(array=array*1., Warray=mask*1., x=udoys, s=1, d=1, iterations=2, axis=0)
-
-    # Further mask out non-smooth values
-    mask = mask & (w > 0.8)
-
-
-    # Reshape the mask to the shape of references
-    mask = mask.reshape(s2_refs.shape[1], s2_refs.shape[2], s2_refs.shape[3])
+    time_series_mask = time_series_mask.reshape(s2_refs.shape[1], s2_refs.shape[2], s2_refs.shape[3])
 
     # Apply the mask to the references and uncertainties
-    s2_refs[:, ~mask] = np.nan
-    s2_uncs[:, ~mask] = np.nan
+    s2_refs[:, ~time_series_mask] = np.nan
+    s2_uncs[:, ~time_series_mask] = np.nan
 
     return s2_refs.transpose(1, 0, 2, 3), s2_uncs.transpose(1, 0, 2, 3), doys, s2_angles
 
