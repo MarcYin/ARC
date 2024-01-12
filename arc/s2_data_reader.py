@@ -3,6 +3,7 @@ import ee
 import json
 import mgrs
 import shutil
+import shapely
 import requests
 import datetime
 import numpy as np
@@ -36,7 +37,14 @@ def load_geojson(file_path: str):
     """
     with open(file_path) as f:
         features = json.load(f)["features"]
-    return shape(features[0]["geometry"]).buffer(0)
+    geom = shape(features[0]["geometry"])
+    if geom.is_valid:
+        return geom
+    else:
+        geom = geom.buffer(0)
+        return geom
+    
+    # return .buffer(0)
 
 def download_s2_image(feature, geom, S2_data_folder: str) -> str:
     """
@@ -77,17 +85,17 @@ def download_s2_image(feature, geom, S2_data_folder: str) -> str:
 
     return filename
 
-def read_s2_official_data(file_names: list[str], geojson_path: str) -> tuple[np.ndarray, np.ndarray]:
+def read_s2_official_data(file_names: List[str], geojson_path: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads S2 official data from provided files, then uses a geojson file to crop 
     the data and handle nodata. It also assumes 10% uncertainty in the S2 data.
 
     Args:
-        file_names (list[str]): The list of file names to read from.
+        file_names (List[str]): The list of file names to read from.
         geojson_path (str): The GeoJSON file path used for cropping.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: A tuple containing the S2 references and their uncertainties.
+        Tuple[np.ndarray, np.ndarray]: A tuple containing the S2 references and their uncertainties.
         
     Raises:
         IOError: An error occurred accessing the bigtable.Table object.
@@ -110,15 +118,15 @@ def read_s2_official_data(file_names: list[str], geojson_path: str) -> tuple[np.
     
     return s2_reflectances, s2_uncertainties
 
-def calculate_s2_angles(features: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def calculate_s2_angles(features: List[dict]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculate the S2 angles for a list of image features.
 
     Args:
-        features (list[dict]): The list of features for each image.
+        features (List[dict]): The list of features for each image.
 
     Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: Three arrays containing the SZA, VZA, and RAA angles respectively.
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: Three arrays containing the SZA, VZA, and RAA angles respectively.
 
     Raises:
         KeyError: If any of the expected properties are missing from the image features.
@@ -351,9 +359,11 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str, S2_d
 
         # Download the S2 images concurrently and get the filenames
         filenames = download_images(ee_geometry, features, S2_data_folder)
-
+        
+        # Convert the geometry to a GeoJSON string
+        geojson_str = shapely.to_geojson(geometry)
         # Read the S2 official data and get references and uncertainties
-        s2_refs, s2_uncs = read_s2_official_data(filenames, geojson_path)
+        s2_refs, s2_uncs = read_s2_official_data(filenames, geojson_str)
 
         s2_refs, s2_uncs, doys, s2_angles = ndvi_filter(s2_refs, s2_uncs, doys, s2_angles)
 

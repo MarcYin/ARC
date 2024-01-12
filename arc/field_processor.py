@@ -88,12 +88,14 @@ if __name__ == "__main__":
     # Constants
     START_OF_SEASON = 170
     CROP_TYPE = 'wheat'
-    NUM_SAMPLES = 200000
+    NUM_SAMPLES = 100000
     GROWTH_SEASON_LENGTH = 60
 
-    start_date = "2022-05-15"
-    end_date = "2022-10-01"
+    start_date = "2021-05-15"
+    end_date = "2021-10-01"
     geojson_path = "test_data/anny_cuypers_achter_stal_geometry.geojson"
+    geojson_path = "test_data/maria_van_geldorp_achter_aardbei_geometry.geojson"
+    
 
     S2_data_folder = Path.home() / f"Downloads/{Path(geojson_path).stem}"
     S2_data_folder.mkdir(parents=True, exist_ok=True)
