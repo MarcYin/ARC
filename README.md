@@ -7,10 +7,12 @@ Department of Geography, UCL
 ucfafyi@ucl.ac.uk
 
 
-This work is part of the [BIG data Archetypes for Crops from EO](https://www.eoafrica-rd.org/research/research-projects-2023-2024/) project, which aims to improve the information available from Earth Observation (EO) data for monitoring crop growth. The project is funded through the ESA/AU EO Africa R&D Facility is a joint undertaking by researchers at University College London (UCL), UK and the University of The Witwatersrand, South Africa.
+This work is part of the [BIG data Archetypes for Crops from EO](https://www.eoafrica-rd.org/research/research-projects-2023-2024/#proposal_1/) project, which aims to improve the information available from Earth Observation (EO) data for monitoring crop growth. The project is funded through the ESA/AU EO Africa R&D Facility is a joint undertaking by researchers at University College London (UCL), UK and the University of The Witwatersrand, South Africa.
 
 
-This is the python module for the archetype work.
+## Installation
+
+To install this Python package, you can run the following command:
 
 ```
 pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
