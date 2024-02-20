@@ -93,8 +93,8 @@ def scale_samples(samples: np.ndarray, medians: np.ndarray) -> Tuple[np.ndarray,
     limits = [
         [1, 3],    # N
         [0, 140],  # Cab
-        [0, 0.02], # Cw
-        [0, 0.06], # Cm
+        [0, 0.04], # Cw
+        [0, 0.1], # Cm
         [0, 10],   # LAI
         [20, 90],  # Leaf angle
         [0, 1.5]   # Cbrown
