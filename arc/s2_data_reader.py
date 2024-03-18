@@ -67,8 +67,12 @@ def download_s2_image(feature, geom, S2_data_folder: str) -> str:
     cloud = ee.Image('COPERNICUS/S2_CLOUD_PROBABILITY/%s'%feature['properties']['system:index'])
     image = image.addBands(cloud)
 
+    # add cloud score+ band
+    cloud_score = ee.Image('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED/%s'%feature['properties']['system:index'])
+    image = image.addBands(cloud_score.multiply(100).int16())
+
     filename = os.path.join(S2_data_folder, S2_product_id + '.tif')
-    bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12', 'probability']
+    bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12', 'probability', 'cs', 'cs_cdf']
 
     if not os.path.exists(filename):
         # Define the download options.
@@ -109,8 +113,8 @@ def read_s2_official_data(file_names: List[str], geojson_path: str) -> Tuple[np.
         
         data = g.ReadAsArray()
         cloud = data[-1]
-        mask = (cloud > 40) | (data[0] > 3000)
-        data = np.where(mask, np.nan, data[:-1] / 10000.0)
+        mask = (cloud < 60) | (data[0] > 3000)
+        data = np.where(mask, np.nan, data[:-3] / 10000.0)
         s2_reflectances.append(data)
     
     s2_reflectances = np.array(s2_reflectances)
