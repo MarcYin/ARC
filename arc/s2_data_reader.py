@@ -118,7 +118,7 @@ def read_s2_official_data(file_names: List[str], geojson_path: str) -> Tuple[np.
         
         data = g.ReadAsArray()
         cloud = data[-2]
-        mask = (cloud < 70) | (data[0] > 3000) | (data[-1] > 200)
+        mask = (cloud < 70) | (data[0] > 3000) | (data[-1] > 100)
         data = np.where(mask, np.nan, data[:-4] / 10000.0)
         s2_reflectances.append(data)
     
