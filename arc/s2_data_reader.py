@@ -61,6 +61,7 @@ def download_s2_image(feature, geom, S2_data_folder: str) -> str:
     s2_data_Res = 10
     image_id = feature['id']
     S2_product_id = feature['properties']['PRODUCT_ID']
+    # print(image_id)
     image = ee.Image(image_id)
 
     # Add the cloud probability band to the image.
@@ -71,8 +72,12 @@ def download_s2_image(feature, geom, S2_data_folder: str) -> str:
     cloud_score = ee.Image('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED/%s'%feature['properties']['system:index'])
     image = image.addBands(cloud_score.multiply(100).int16())
 
+    # L1C B10
+    b10 = ee.Image('COPERNICUS/S2_HARMONIZED/%s'%feature['properties']['system:index']).select('B10')
+    image = image.addBands(b10)
+
     filename = os.path.join(S2_data_folder, S2_product_id + '.tif')
-    bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12', 'probability', 'cs', 'cs_cdf']
+    bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12', 'probability', 'cs', 'cs_cdf', 'B10']
 
     if not os.path.exists(filename):
         # Define the download options.
@@ -112,9 +117,9 @@ def read_s2_official_data(file_names: List[str], geojson_path: str) -> Tuple[np.
             raise IOError("An error occurred while reading the file: {}".format(file_name))
         
         data = g.ReadAsArray()
-        cloud = data[-1]
-        mask = (cloud < 70) | (data[0] > 3000) #| (data[7] < 1500)
-        data = np.where(mask, np.nan, data[:-3] / 10000.0)
+        cloud = data[-2]
+        mask = (cloud < 70) | (data[0] > 3000) | (data[-1] > 200)
+        data = np.where(mask, np.nan, data[:-4] / 10000.0)
         s2_reflectances.append(data)
     
     s2_reflectances = np.array(s2_reflectances)
