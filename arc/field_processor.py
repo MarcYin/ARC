@@ -57,15 +57,19 @@ def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
             plt.show()
 
     # Assimilate data
-    post_bio_tensor, post_bio_unc_tensor, post_bio_scale_tensor, post_pheo_tensor, post_soil_tensor = assimilate(
+    post_bio_tensor, post_bio_unc_tensor, post_bio_scale_tensor, post_pheo_tensor, post_soil_tensor, mean_ref, best_candidate = assimilate(
         s2_refs, arc_refs, s2_uncs, pheo_samples, bio_samples, soil_samples, orig_bios, neighbours
     )
+
+    # post_bio_tensor, post_bio_unc_tensor, post_bio_scale_tensor, post_pheo_tensor, post_soil_tensor = assimilate(
+    #     s2_refs, arc_refs, s2_uncs, pheo_samples, bio_samples, soil_samples, orig_bios, neighbours
+    # )
 
     # Concatenate tensors
     scale_data = np.concatenate([post_bio_scale_tensor, post_pheo_tensor, post_soil_tensor], axis=1)
 
     # Save resulting data
-    save_data(output_file_path, post_bio_tensor, post_bio_unc_tensor, scale_data, geotransform, crs, mask, doys)
+    save_data(output_file_path, post_bio_tensor, post_bio_unc_tensor, scale_data, geotransform, crs, mask, doys, mean_ref, best_candidate)
     return scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys
 
 

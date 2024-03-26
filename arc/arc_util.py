@@ -78,7 +78,7 @@ def ndvi_filter(s2_refs: np.array, s2_uncs: np.array, doys: np.array, s2_angles:
     return s2_refs.transpose(1, 0, 2, 3), s2_uncs.transpose(1, 0, 2, 3), doys, s2_angles
 
 
-def save_data(file_path, post_bio_tensor, post_bio_unc_tensor, dat, geotransform, crs, mask, doys):
+def save_data(file_path, post_bio_tensor, post_bio_unc_tensor, dat, geotransform, crs, mask, doys, mean_ref, best_candidate):
     """
     Save data to a npz file.
 
@@ -91,4 +91,4 @@ def save_data(file_path, post_bio_tensor, post_bio_unc_tensor, dat, geotransform
         crs (str): The CRS.
         mask (np.array): The mask.
     """
-    np.savez(file_path, post_bio_tensor=post_bio_tensor, post_bio_unc_tensor=post_bio_unc_tensor, dat=dat, geotransform=geotransform, crs=crs, mask=mask, doys=doys)
+    np.savez(file_path, post_bio_tensor=post_bio_tensor, post_bio_unc_tensor=post_bio_unc_tensor, dat=dat, geotransform=geotransform, crs=crs, mask=mask, doys=doys, mean_ref=mean_ref, best_candidate=best_candidate)
