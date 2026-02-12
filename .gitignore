@@ -4,3 +4,7 @@
 arc.egg-info
 .DS_Store
 test_LMU.py
+build/
+dist/
+*.egg
+1.0.0

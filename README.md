@@ -19,14 +19,86 @@ This work is part of the [BIG data Archetypes for Crops from EO](https://www.eoa
 ![Wits](https://www.wits.ac.za/media/wits-university-style-assets/images/Wits_Centenary_Logo_Large.svg)
 
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb)
+
 ## Installation
 
 To install this Python package, you can run the following command:
 
 ```
-pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
+pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 ```
 
+## Data Sources
+
+ARC supports four data sources for Sentinel-2 imagery. **CDSE is the default**.
+
+| Source | `data_source=` | Format | Auth Required | Speed |
+|--------|----------------|--------|---------------|-------|
+| CDSE | `'cdse'` (default) | JP2 | S3 keys or login | Moderate |
+| AWS Earth Search | `'aws'` | COG | None | Fast |
+| Planetary Computer | `'planetary'` | COG | Auto (pip package) | Fast |
+| Google Earth Engine | `'gee'` | GeoTIFF | GEE account | Fast |
+
+### Option A: CDSE (Copernicus Data Space Ecosystem) — Default
+
+CDSE provides free access to Sentinel-2 L2A data via STAC API and S3 storage.
+
+#### Setting up CDSE credentials
+
+**Method 1: S3 Access Keys (recommended)**
+
+1. Register for a free account at [Copernicus Data Space Ecosystem](https://dataspace.copernicus.eu)
+2. Go to the [S3 credentials dashboard](https://eodata.dataspace.copernicus.eu)
+3. Click "Generate S3 credentials" to create an access key and secret key
+4. Set them as environment variables:
+
+```bash
+export CDSE_S3_ACCESS_KEY="your-access-key"
+export CDSE_S3_SECRET_KEY="your-secret-key"
+```
+
+**Method 2: Username / Password**
+
+1. Register at [Copernicus Data Space Ecosystem](https://dataspace.copernicus.eu)
+2. Set your login credentials as environment variables:
+
+```bash
+export CDSE_USERNAME="your-email@example.com"
+export CDSE_PASSWORD="your-password"
+```
+
+### Option B: AWS Earth Search — No Auth Required
+
+[Element 84 Earth Search](https://earth-search.aws.element84.com/v1) provides Sentinel-2 L2A as **Cloud Optimized GeoTIFFs** on AWS. No account or credentials needed.
+
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ..., data_source='aws'
+)
+```
+
+### Option C: Microsoft Planetary Computer
+
+[Planetary Computer](https://planetarycomputer.microsoft.com/) provides Sentinel-2 L2A as COGs on Azure. Authentication is handled automatically by the `planetary-computer` package.
+
+```bash
+pip install planetary-computer
+```
+
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ..., data_source='planetary'
+)
+```
+
+### Option D: Google Earth Engine (GEE)
+
+Use `data_source='gee'` when calling `arc_field()`. Requires GEE authentication:
+
+1. Create a [Google Earth Engine](https://earthengine.google.com/) account
+2. Run: `earthengine authenticate --auth_mode=notebook`
+3. Follow the URL in the terminal, sign in, and paste the verification code
 
 ## Generating archtype ensemble
 
@@ -79,9 +151,9 @@ plt.ylabel('Max LAI (m$^2$/m$^2$)')
 plt.show()
 ```
 
-## Testing archetype solver 
+## Testing archetype solver
 
-This package contains a function to solve the biophysical parameters with time series of Sentinel-2 (S2) observations. The S2 surface reflectance is downloaded from GEE with an assumed uncertainty of 10%. 
+This package contains a function to solve the biophysical parameters with time series of Sentinel-2 (S2) observations. The S2 surface reflectance is downloaded from CDSE (default) or GEE with an assumed uncertainty of 10%.
 
 The function `arc_field` takes the following parameters:
 
@@ -94,6 +166,7 @@ The function `arc_field` takes the following parameters:
 - `num_samples`: The number of reflectance samples to generate.
 - `growth_season_length`: The length of the crop growth season in days.
 - `S2_data_folder`: The folder used to store S2 data.
+- `data_source`: Data source for S2 imagery: `'cdse'` (default) or `'gee'`.
 
 And returns the following:
 - `scale_data`: The scaling parameters used to scale the archetypes.
@@ -119,32 +192,9 @@ The shape of `post_bio_tensor` should be (number_doys, 7, number_valid_pixels), 
 
 ### Full example:
 
+You can try this interactively using the [Colab notebook](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb).
 
-#### ⚠️⚠️⚠️ Google Earth Engine authentication before using ARC
-
-1. Create a Google Earth Engine account and sign in to [Google Earth Engine](https://earthengine.google.com/).
- 
-2. You can run the following command to set up the Google Earth Engine authentication:
-
-```bash
-earthengine authenticate --auth_mode=notebook
-```
-You should see the following message in the terminal:
-```console
-To authorize access needed by Earth Engine, open the following URL in a web browser and follow the instructions. If the web browser does not start automatically, please manually browse the URL below.
-        https://code.earthengine.google.com/client-auth?scopes=https...
-The authorization workflow will generate a code, which you should paste in the box below.
-Enter verification code:
-```
-
-4. Copy the URL to your browser and sign in to your Google Earth Engine account. You will be given a verification code. Copy the verification code and paste it into the terminal. You should see the following message:
-```bash
-Successfully saved authorization token.
-```
-
-5. You can now exit the shell and stop the container by typing `exit` in the terminal. 
-   
-6. You can now run the following command to test the solver over one [South African field](https://github.com/MarcYin/ARC/blob/main/arc/test_data/SF_field.geojson):
+Make sure you have set up credentials for your chosen data source (see [Data Sources](#data-sources) above), then run the following to test the solver over one [South African field](https://github.com/profLewis/ARC/blob/main/arc/test_data/SF_field.geojson):
 
 
 ```python
@@ -174,16 +224,17 @@ def main():
     S2_data_folder.mkdir(parents=True, exist_ok=True)
     
     scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
-        start_date, 
-        end_date, 
-        geojson_path, 
-        START_OF_SEASON, 
-        CROP_TYPE, 
-        f'{S2_data_folder}/SF_field.npz', 
-        NUM_SAMPLES, 
-        GROWTH_SEASON_LENGTH, 
+        start_date,
+        end_date,
+        geojson_path,
+        START_OF_SEASON,
+        CROP_TYPE,
+        f'{S2_data_folder}/SF_field.npz',
+        NUM_SAMPLES,
+        GROWTH_SEASON_LENGTH,
         str(S2_data_folder),
-        plot=True
+        plot=True,
+        data_source='cdse',  # or 'gee' for Google Earth Engine
     )
 
     plot_lai_over_time(doys, post_bio_tensor)

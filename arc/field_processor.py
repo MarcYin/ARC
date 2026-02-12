@@ -2,15 +2,32 @@ import numpy as np
 from arc.arc_util import save_data
 from arc.assimilate_jax import assimilate
 from arc.approximate_KNN_search import get_neighbours
-from arc.s2_data_reader import get_s2_official_data
 from arc.arc_sample_generator import generate_arc_refs
 
+
+def _get_data_reader(data_source):
+    """
+    Return a reader function for the requested data source.
+
+    Uses the `eof` (EO Fetch) package for all data sources.
+    """
+    import eof
+
+    def reader(start_date, end_date, geojson_path, S2_data_folder='./'):
+        return eof.get_s2_official_data(
+            start_date, end_date, geojson_path,
+            S2_data_folder=S2_data_folder, source=data_source,
+        )
+    return reader
+
+
 def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
-              crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False):
+              crop_type, output_file_path, num_samples=10000, growth_season_length=45,
+              S2_data_folder='./S2_data', plot=False, data_source='cdse'):
     """
     Performs the ARC Field pipeline which includes reading satellite data, generating samples, searching for neighbours,
     assimilating data, and saving the resulting data.
-    
+
     Args:
         s2_start_date, s2_end_date : Strings representing the start and end dates for the satellite data.
         geojson_path : Path to the GeoJSON file.
@@ -20,13 +37,15 @@ def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
         num_samples : Number of samples to generate (default is 1,000,000).
         growth_season_length : Length of the growth season (default is 45).
         S2_data_folder : Directory where satellite data is stored.
-        
+        data_source : Data source for S2 imagery: 'cdse', 'gee', 'aws',
+            'planetary', or 'auto' (picks fastest available). Default: 'cdse'.
+
     Returns:
         None. The results are saved to the output_file_path.
     """
     # Read satellite data
-
-    s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs = get_s2_official_data(
+    get_s2_data = _get_data_reader(data_source)
+    s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs = get_s2_data(
         s2_start_date, s2_end_date, geojson_path, S2_data_folder
     )
 
