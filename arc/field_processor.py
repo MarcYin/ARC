@@ -10,20 +10,21 @@ def _get_data_reader(data_source):
     Return a reader function for the requested data source.
 
     Uses the `eof` (EO Fetch) package for all data sources.
+    Returns an S2Result dataclass.
     """
     import eof
 
     def reader(start_date, end_date, geojson_path, S2_data_folder='./'):
-        return eof.get_s2_official_data(
+        return eof.get_s2_data(
             start_date, end_date, geojson_path,
-            S2_data_folder=S2_data_folder, source=data_source,
+            data_folder=S2_data_folder, source=data_source,
         )
     return reader
 
 
 def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
               crop_type, output_file_path, num_samples=10000, growth_season_length=45,
-              S2_data_folder='./S2_data', plot=False, data_source='cdse'):
+              S2_data_folder='./S2_data', plot=False, data_source='aws'):
     """
     Performs the ARC Field pipeline which includes reading satellite data, generating samples, searching for neighbours,
     assimilating data, and saving the resulting data.
@@ -37,17 +38,22 @@ def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
         num_samples : Number of samples to generate (default is 1,000,000).
         growth_season_length : Length of the growth season (default is 45).
         S2_data_folder : Directory where satellite data is stored.
-        data_source : Data source for S2 imagery: 'cdse', 'gee', 'aws',
-            'planetary', or 'auto' (picks fastest available). Default: 'cdse'.
+        data_source : Data source for S2 imagery: 'aws', 'cdse', 'planetary',
+            'gee', or 'auto' (picks fastest available). Default: 'aws'.
 
     Returns:
         None. The results are saved to the output_file_path.
     """
     # Read satellite data
-    get_s2_data = _get_data_reader(data_source)
-    s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs = get_s2_data(
-        s2_start_date, s2_end_date, geojson_path, S2_data_folder
-    )
+    fetch_s2 = _get_data_reader(data_source)
+    result = fetch_s2(s2_start_date, s2_end_date, geojson_path, S2_data_folder)
+    s2_refs = result.reflectance
+    s2_uncs = result.uncertainty
+    s2_angles = result.angles
+    doys = result.doys
+    mask = result.mask
+    geotransform = result.geotransform
+    crs = result.crs
 
     s2_refs = s2_refs[:, :, ~mask].transpose(1, 0, 2)
     s2_uncs = s2_uncs[:, :, ~mask].transpose(1, 0, 2)

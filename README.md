@@ -19,7 +19,7 @@ This work is part of the [BIG data Archetypes for Crops from EO](https://www.eoa
 ![Wits](https://www.wits.ac.za/media/wits-university-style-assets/images/Wits_Centenary_Logo_Large.svg)
 
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_arc.ipynb)
 
 ## Installation
 
@@ -31,20 +31,42 @@ pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 
 ## Data Sources
 
-ARC supports four data sources for Sentinel-2 imagery. **CDSE is the default**.
+ARC supports four data sources for Sentinel-2 imagery. **AWS is the default** (free, fast, no login required).
 
-| Source | `data_source=` | Format | Auth Required | Speed |
-|--------|----------------|--------|---------------|-------|
-| CDSE | `'cdse'` (default) | JP2 | S3 keys or login | Moderate |
-| AWS Earth Search | `'aws'` | COG | None | Fast |
-| Planetary Computer | `'planetary'` | COG | Auto (pip package) | Fast |
-| Google Earth Engine | `'gee'` | GeoTIFF | GEE account | Fast |
+| Source | `data_source=` | Auth Required | Cost | Speed |
+|--------|----------------|---------------|------|-------|
+| AWS Earth Search | `'aws'` (default) | None | Free | Fast |
+| Planetary Computer | `'planetary'` | Auto (`pip install planetary-computer`) | Free | Fast |
+| CDSE | `'cdse'` | S3 keys or login | Free | Moderate |
+| Google Earth Engine | `'gee'` | GEE account | Free (non-commercial) | Fast |
 
-### Option A: CDSE (Copernicus Data Space Ecosystem) — Default
+### Option A: AWS Earth Search (default) — No Auth Required
 
-CDSE provides free access to Sentinel-2 L2A data via STAC API and S3 storage.
+[Element 84 Earth Search](https://earth-search.aws.element84.com/v1) provides Sentinel-2 L2A as **Cloud Optimized GeoTIFFs** on AWS. No account or credentials needed — just install and run.
 
-#### Setting up CDSE credentials
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ...,  # data_source='aws' is the default
+)
+```
+
+### Option B: Microsoft Planetary Computer
+
+[Planetary Computer](https://planetarycomputer.microsoft.com/) provides Sentinel-2 L2A as COGs on Azure. Authentication is handled automatically by the `planetary-computer` package.
+
+```bash
+pip install planetary-computer
+```
+
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ..., data_source='planetary'
+)
+```
+
+### Option C: CDSE (Copernicus Data Space Ecosystem)
+
+CDSE provides free access to Sentinel-2 L2A data via STAC API and S3 storage. Requires credentials.
 
 **Method 1: S3 Access Keys (recommended)**
 
@@ -66,30 +88,6 @@ export CDSE_S3_SECRET_KEY="your-secret-key"
 ```bash
 export CDSE_USERNAME="your-email@example.com"
 export CDSE_PASSWORD="your-password"
-```
-
-### Option B: AWS Earth Search — No Auth Required
-
-[Element 84 Earth Search](https://earth-search.aws.element84.com/v1) provides Sentinel-2 L2A as **Cloud Optimized GeoTIFFs** on AWS. No account or credentials needed.
-
-```python
-scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
-    ..., data_source='aws'
-)
-```
-
-### Option C: Microsoft Planetary Computer
-
-[Planetary Computer](https://planetarycomputer.microsoft.com/) provides Sentinel-2 L2A as COGs on Azure. Authentication is handled automatically by the `planetary-computer` package.
-
-```bash
-pip install planetary-computer
-```
-
-```python
-scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
-    ..., data_source='planetary'
-)
 ```
 
 ### Option D: Google Earth Engine (GEE)
@@ -153,7 +151,7 @@ plt.show()
 
 ## Testing archetype solver
 
-This package contains a function to solve the biophysical parameters with time series of Sentinel-2 (S2) observations. The S2 surface reflectance is downloaded from CDSE (default) or GEE with an assumed uncertainty of 10%.
+This package contains a function to solve the biophysical parameters with time series of Sentinel-2 (S2) observations. The S2 surface reflectance is downloaded from AWS (default, no login required) or other platforms with an assumed uncertainty of 10%.
 
 The function `arc_field` takes the following parameters:
 
@@ -166,7 +164,7 @@ The function `arc_field` takes the following parameters:
 - `num_samples`: The number of reflectance samples to generate.
 - `growth_season_length`: The length of the crop growth season in days.
 - `S2_data_folder`: The folder used to store S2 data.
-- `data_source`: Data source for S2 imagery: `'cdse'` (default) or `'gee'`.
+- `data_source`: Data source for S2 imagery: `'aws'` (default), `'planetary'`, `'cdse'`, `'gee'`, or `'auto'`.
 
 And returns the following:
 - `scale_data`: The scaling parameters used to scale the archetypes.
@@ -194,7 +192,7 @@ The shape of `post_bio_tensor` should be (number_doys, 7, number_valid_pixels), 
 
 You can try this interactively using the [Colab notebook](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb).
 
-Make sure you have set up credentials for your chosen data source (see [Data Sources](#data-sources) above), then run the following to test the solver over one [South African field](https://github.com/profLewis/ARC/blob/main/arc/test_data/SF_field.geojson):
+No credentials are needed for the default AWS data source. Run the following to test the solver over one [South African field](https://github.com/profLewis/ARC/blob/main/arc/test_data/SF_field.geojson):
 
 
 ```python
@@ -234,7 +232,7 @@ def main():
         GROWTH_SEASON_LENGTH,
         str(S2_data_folder),
         plot=True,
-        data_source='cdse',  # or 'gee' for Google Earth Engine
+        data_source='aws',  # default — no credentials needed
     )
 
     plot_lai_over_time(doys, post_bio_tensor)
