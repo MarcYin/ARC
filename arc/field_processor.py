@@ -7,33 +7,18 @@ from arc.arc_sample_generator import generate_arc_refs
 
 def _get_data_reader(data_source):
     """
-    Return the get_s2_official_data function for the requested data source.
+    Return a reader function for the requested data source.
 
-    Uses lazy imports so that GEE (ee.Initialize) is only triggered when
-    data_source='gee', and pystac_client is only imported for 'cdse'.
+    Uses the `eof` (EO Fetch) package for all data sources.
     """
-    if data_source == 'cdse':
-        from arc.s2_cdse_reader import get_s2_official_data
-        return get_s2_official_data
-    elif data_source == 'gee':
-        from arc.s2_data_reader import get_s2_official_data
-        return get_s2_official_data
-    elif data_source == 'aws':
-        from arc.s2_aws_reader import get_s2_official_data
-        return get_s2_official_data
-    elif data_source == 'planetary':
-        from arc.s2_planetary_reader import get_s2_official_data
-        return get_s2_official_data
-    elif data_source == 'auto':
-        from arc.credentials import select_data_source
-        resolved = select_data_source()
-        print(f"Auto-selected data source: {resolved}")
-        return _get_data_reader(resolved)
-    else:
-        raise ValueError(
-            f"Unknown data_source '{data_source}'. "
-            f"Must be 'cdse', 'gee', 'aws', 'planetary', or 'auto'."
+    import eof
+
+    def reader(start_date, end_date, geojson_path, S2_data_folder='./'):
+        return eof.get_s2_official_data(
+            start_date, end_date, geojson_path,
+            S2_data_folder=S2_data_folder, source=data_source,
         )
+    return reader
 
 
 def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
