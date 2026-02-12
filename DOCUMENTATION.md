@@ -168,7 +168,7 @@ Exports the two main entry points:
 **Function: `arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season, crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False, data_source='cdse')`**
 
 Orchestrates the full pipeline by calling, in sequence:
-1. `eof.get_s2_official_data()` — download and preprocess satellite data (via [eof](https://github.com/profLewis/eof) package)
+1. `eof.get_s2_data()` — download and preprocess satellite data (via [eof](https://github.com/profLewis/eof) package)
 2. `generate_arc_refs()` — create the archetype ensemble
 3. `get_neighbours()` — find nearest neighbours
 4. `assimilate()` — compute posterior parameter estimates
@@ -288,7 +288,7 @@ Earth Observation data retrieval is handled by the separate [eof](https://github
 | [Planetary Computer](https://planetarycomputer.microsoft.com/) | `'planetary'` | `pip install planetary-computer` |
 | [Google Earth Engine](https://earthengine.google.com/) | `'gee'` | [GEE account](https://signup.earthengine.google.com/) |
 
-ARC currently uses `eof.get_s2_official_data()` for Sentinel-2 data. The `eof` package also supports multi-sensor retrieval via `eof.get_eo_data()` which returns data resampled to 10m with footprint ID maps for multi-scale processing.
+ARC uses `eof.get_s2_data()` for Sentinel-2 data, which returns an `S2Result` dataclass. The `eof` package also supports multi-sensor retrieval via `eof.get_eo_data()` which returns an `EOResult` with data resampled to 10m, footprint ID maps, and spectral response functions.
 
 Using `data_source='auto'` picks the first available platform (defaults to AWS).
 
