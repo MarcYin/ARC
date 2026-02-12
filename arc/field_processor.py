@@ -18,9 +18,16 @@ def _get_data_reader(data_source):
     elif data_source == 'gee':
         from arc.s2_data_reader import get_s2_official_data
         return get_s2_official_data
+    elif data_source == 'aws':
+        from arc.s2_aws_reader import get_s2_official_data
+        return get_s2_official_data
+    elif data_source == 'planetary':
+        from arc.s2_planetary_reader import get_s2_official_data
+        return get_s2_official_data
     else:
         raise ValueError(
-            f"Unknown data_source '{data_source}'. Must be 'cdse' or 'gee'."
+            f"Unknown data_source '{data_source}'. "
+            f"Must be 'cdse', 'gee', 'aws', or 'planetary'."
         )
 
 

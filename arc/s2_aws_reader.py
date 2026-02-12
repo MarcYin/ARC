@@ -1,52 +1,42 @@
 """
-Sentinel-2 L2A data retrieval from the Copernicus Data Space Ecosystem (CDSE) STAC API.
+Sentinel-2 L2A data retrieval from Element 84 Earth Search (AWS).
 
-This module provides the same interface as s2_data_reader.py (GEE-based) but uses the
-CDSE STAC catalogue and S3 storage for data access.
+Cloud Optimized GeoTIFFs (COGs) served from the AWS Registry of Open Data.
+No authentication required.
 
-Authentication:
-    Option 1 (preferred): Set CDSE_S3_ACCESS_KEY and CDSE_S3_SECRET_KEY environment variables.
-        Generate these at https://eodata.dataspace.copernicus.eu
-    Option 2 (fallback): Set CDSE_USERNAME and CDSE_PASSWORD environment variables.
-        These are your Copernicus Data Space Ecosystem login credentials.
+STAC endpoint: https://earth-search.aws.element84.com/v1
+Collection: sentinel-2-l2a
 """
 
 import os
 import json
-import datetime
 import threading
 import numpy as np
 from osgeo import gdal
-from typing import List, Tuple
+from typing import Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from shapely.geometry import shape
 import shapely
 import mgrs
-import requests
 from tqdm.auto import tqdm
 
 import pystac_client
 
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
-# CDSE endpoints
-CDSE_STAC_URL = "https://stac.dataspace.copernicus.eu/v1"
-CDSE_S3_ENDPOINT = "eodata.dataspace.copernicus.eu"
-CDSE_TOKEN_URL = (
-    "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/"
-    "protocol/openid-connect/token"
-)
-CDSE_COLLECTION = "sentinel-2-l2a"
+# AWS Earth Search endpoints
+AWS_STAC_URL = "https://earth-search.aws.element84.com/v1"
+AWS_COLLECTION = "sentinel-2-l2a"
 
-# Band asset keys in the order expected by ARC: B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12
+# Band asset keys mapping: AWS Earth Search uses descriptive names
+# ARC order: B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12
 ARC_BAND_ASSETS = [
-    'B02_10m', 'B03_10m', 'B04_10m',
-    'B05_20m', 'B06_20m', 'B07_20m',
-    'B08_10m',
-    'B8A_20m', 'B11_20m', 'B12_20m',
+    'blue', 'green', 'red',
+    'rededge1', 'rededge2', 'rededge3',
+    'nir', 'nir08', 'swir16', 'swir22',
 ]
-SCL_ASSET_KEY = 'SCL_20m'
+SCL_ASSET_KEY = 'scl'
 
 # SCL classes to mask: no data, saturated, cloud shadow, cloud med/high, cirrus, snow
 SCL_MASK_VALUES = frozenset({0, 1, 3, 8, 9, 10, 11})
@@ -54,80 +44,31 @@ SCL_MASK_VALUES = frozenset({0, 1, 3, 8, 9, 10, 11})
 QUANTIFICATION_VALUE = 10000.0
 BASELINE_OFFSET = -1000
 
-# CDSE allows max 4 concurrent S3 connections; semaphore enforces this globally
-_CDSE_MAX_CONCURRENT_READS = 4
-_cdse_read_semaphore = threading.Semaphore(_CDSE_MAX_CONCURRENT_READS)
+# AWS has no strict connection limit like CDSE, but be reasonable
+_AWS_MAX_CONCURRENT_READS = 8
+_aws_read_semaphore = threading.Semaphore(_AWS_MAX_CONCURRENT_READS)
 
 
 # ---------------------------------------------------------------------------
-# Authentication
+# GDAL configuration
 # ---------------------------------------------------------------------------
 
-def _get_cdse_access_token(username: str, password: str) -> str:
-    """Obtain an OAuth2 access token from the CDSE identity service."""
-    data = {
-        "client_id": "cdse-public",
-        "grant_type": "password",
-        "username": username,
-        "password": password,
-    }
-    resp = requests.post(CDSE_TOKEN_URL, data=data, timeout=30)
-    resp.raise_for_status()
-    return resp.json()["access_token"]
-
-
-def _configure_gdal_for_cdse():
-    """
-    Configure GDAL to read from CDSE S3 storage.
-
-    Tries S3 keys first (CDSE_S3_ACCESS_KEY/SECRET_KEY), then falls back to
-    username/password token authentication via /vsicurl/.
-
-    Returns:
-        str: The GDAL virtual filesystem prefix to use ('/vsis3' or '/vsicurl').
-    """
-    from arc.credentials import get_cdse_credentials
-    creds = get_cdse_credentials()
-    s3_key = creds["s3_access_key"]
-    s3_secret = creds["s3_secret_key"]
-
-    if s3_key and s3_secret:
-        gdal.SetConfigOption("AWS_S3_ENDPOINT", CDSE_S3_ENDPOINT)
-        gdal.SetConfigOption("AWS_ACCESS_KEY_ID", s3_key)
-        gdal.SetConfigOption("AWS_SECRET_ACCESS_KEY", s3_secret)
-        gdal.SetConfigOption("AWS_VIRTUAL_HOSTING", "FALSE")
-        gdal.SetConfigOption("AWS_HTTPS", "YES")
-        vsi_prefix = "/vsis3"
-    else:
-        username = creds["username"]
-        password = creds["password"]
-        if not (username and password):
-            raise EnvironmentError(
-                "CDSE credentials not found. Set either:\n"
-                "  CDSE_S3_ACCESS_KEY + CDSE_S3_SECRET_KEY  (preferred), or\n"
-                "  CDSE_USERNAME + CDSE_PASSWORD\n"
-                "Generate S3 keys at https://eodata.dataspace.copernicus.eu"
-            )
-        token = _get_cdse_access_token(username, password)
-        gdal.SetConfigOption("GDAL_HTTP_HEADERS", f"Authorization: Bearer {token}")
-        vsi_prefix = "/vsicurl"
-
-    # Optimizations to reduce network overhead
+def _configure_gdal_for_aws():
+    """Configure GDAL for reading COGs from AWS S3 (public, no auth)."""
+    gdal.SetConfigOption("AWS_NO_SIGN_REQUEST", "YES")
     gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
-    gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.jp2,.xml")
+    gdal.SetConfigOption("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.xml")
     gdal.SetConfigOption("GDAL_HTTP_MAX_RETRY", "5")
-    gdal.SetConfigOption("GDAL_HTTP_RETRY_DELAY", "5")
+    gdal.SetConfigOption("GDAL_HTTP_RETRY_DELAY", "2")
     gdal.SetConfigOption("GDAL_CACHEMAX", "256")
-    gdal.SetConfigOption("CPL_VSIL_CURL_CACHE_SIZE", "134217728")  # 128 MB curl cache
+    gdal.SetConfigOption("CPL_VSIL_CURL_CACHE_SIZE", "134217728")  # 128 MB
     gdal.SetConfigOption("GDAL_NUM_THREADS", "ALL_CPUS")
     gdal.SetConfigOption("VSI_CACHE", "TRUE")
-    gdal.SetConfigOption("VSI_CACHE_SIZE", "134217728")  # 128 MB per file handle
-
-    return vsi_prefix
+    gdal.SetConfigOption("VSI_CACHE_SIZE", "134217728")  # 128 MB per file
 
 
 # ---------------------------------------------------------------------------
-# GeoJSON loading (mirrors s2_data_reader.load_geojson)
+# GeoJSON loading
 # ---------------------------------------------------------------------------
 
 def _load_geojson(file_path: str):
@@ -146,13 +87,10 @@ def _load_geojson(file_path: str):
 
 def _search_s2_collection(geojson_geometry: dict, start_date: str, end_date: str,
                           max_cloud_cover: int = 80) -> list:
-    """
-    Search the CDSE STAC catalogue for Sentinel-2 L2A items intersecting the
-    given geometry within the date range.
-    """
-    client = pystac_client.Client.open(CDSE_STAC_URL)
+    """Search AWS Earth Search for Sentinel-2 L2A items."""
+    client = pystac_client.Client.open(AWS_STAC_URL)
     search = client.search(
-        collections=[CDSE_COLLECTION],
+        collections=[AWS_COLLECTION],
         intersects=geojson_geometry,
         datetime=f"{start_date}/{end_date}",
         query={"eo:cloud_cover": {"lte": max_cloud_cover}},
@@ -168,9 +106,18 @@ def _filter_to_single_mgrs_tile(items: list, centroid_lon: float,
     """Filter STAC items to the MGRS tile containing the field centroid."""
     m = mgrs.MGRS()
     target_tile = m.toMGRS(centroid_lat, centroid_lon)[:5]
-    target_code = f"MGRS-{target_tile}"
-    return [item for item in items
-            if item.properties.get("grid:code", "") == target_code]
+    # AWS Earth Search uses mgrs:grid_square or grid:code
+    filtered = []
+    for item in items:
+        props = item.properties
+        grid_code = props.get("grid:code", "")
+        mgrs_tile = props.get("mgrs:grid_square", "")
+        s2_tile = props.get("s2:mgrs_tile", "")
+        if (grid_code == f"MGRS-{target_tile}"
+                or mgrs_tile == target_tile
+                or s2_tile == target_tile):
+            filtered.append(item)
+    return filtered
 
 
 # ---------------------------------------------------------------------------
@@ -178,15 +125,7 @@ def _filter_to_single_mgrs_tile(items: list, centroid_lon: float,
 # ---------------------------------------------------------------------------
 
 def _extract_angles_from_item(item) -> Tuple[float, float, float]:
-    """
-    Extract (SZA, VZA, RAA) in degrees from STAC item properties.
-
-    CDSE properties:
-        view:sun_elevation  → SZA = 90 - sun_elevation
-        view:sun_azimuth    → SAA
-        view:incidence_angle → VZA (scene-level mean across bands/detectors)
-        view:azimuth        → VAA
-    """
+    """Extract (SZA, VZA, RAA) in degrees from STAC item properties."""
     props = item.properties
     sun_elevation = props.get("view:sun_elevation", 0.0)
     sun_azimuth = props.get("view:sun_azimuth", 0.0)
@@ -204,47 +143,30 @@ def _extract_doy_from_item(item) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Band reading with GDAL
+# Band reading with GDAL (COG - efficient windowed reads)
 # ---------------------------------------------------------------------------
 
-def _s3_path_from_href(href: str) -> str:
-    """
-    Convert an S3 href like 's3://eodata/Sentinel-2/...' to the bucket-relative
-    path '/eodata/Sentinel-2/...'.
-    """
-    if href.startswith("s3://"):
-        return "/" + href[5:]
-    if href.startswith("/eodata"):
-        return href
-    return href
-
-
-def _https_url_from_href(href: str) -> str:
-    """
-    Convert an S3 href to an HTTPS URL for /vsicurl/ access.
-    """
-    path = _s3_path_from_href(href)
-    return f"https://{CDSE_S3_ENDPOINT}{path}"
-
-
-def _read_and_crop_band(vsi_prefix: str, href: str, geojson_cutline: str,
+def _read_and_crop_band(href: str, geojson_cutline: str,
                         target_resolution: int = 10,
-                        resample_alg: str = 'bilinear') -> np.ndarray:
+                        resample_alg: str = 'bilinear') -> tuple:
     """
-    Read a single band from CDSE, crop to field boundary, resample to target resolution.
-    Returns integer (Int16) array to minimize transfer.
+    Read a single COG band, crop to field boundary, resample to target resolution.
+    COGs support efficient partial reads via HTTP range requests.
     """
-    if vsi_prefix == "/vsis3":
-        vsi_path = f"/vsis3{_s3_path_from_href(href)}"
+    # AWS COGs can be accessed directly via /vsicurl/
+    if href.startswith("s3://"):
+        vsi_path = f"/vsis3/{href[5:]}"
+    elif href.startswith("http"):
+        vsi_path = f"/vsicurl/{href}"
     else:
-        vsi_path = f"/vsicurl/{_https_url_from_href(href)}"
+        vsi_path = href
 
     resample_map = {
         'bilinear': gdal.GRA_Bilinear,
         'nearest': gdal.GRA_NearestNeighbour,
     }
 
-    with _cdse_read_semaphore:
+    with _aws_read_semaphore:
         ds = gdal.Warp(
             '', vsi_path,
             format='MEM',
@@ -267,22 +189,13 @@ def _read_and_crop_band(vsi_prefix: str, href: str, geojson_cutline: str,
     return data, gt, crs
 
 
-def _read_and_crop_all_bands(item, geojson_cutline: str, vsi_prefix: str,
+def _read_and_crop_all_bands(item, geojson_cutline: str,
                              target_resolution: int = 10,
                              band_executor: ThreadPoolExecutor = None):
     """
     Read all 10 spectral bands + SCL for a single STAC item.
-
-    When band_executor is provided, band reads are submitted concurrently.
-    The global _cdse_read_semaphore limits actual concurrent network I/O.
-
-    Returns:
-        band_data: (10, H, W) int16 array of DN values
-        scl_data: (H, W) int16 array of SCL classification
-        geotransform: 6-tuple
-        crs: WKT string
+    Band reads are submitted concurrently when band_executor is provided.
     """
-    # Build list of (asset_key, href, resample_alg) for all bands
     band_tasks = []
     for asset_key in ARC_BAND_ASSETS:
         asset = item.assets.get(asset_key)
@@ -296,12 +209,11 @@ def _read_and_crop_all_bands(item, geojson_cutline: str, vsi_prefix: str,
     band_tasks.append((SCL_ASSET_KEY, scl_asset.href, 'nearest'))
 
     if band_executor is not None:
-        # Submit all 11 band reads concurrently
         futures = {}
         for asset_key, href, resample in band_tasks:
             future = band_executor.submit(
                 _read_and_crop_band,
-                vsi_prefix, href, geojson_cutline,
+                href, geojson_cutline,
                 target_resolution=target_resolution,
                 resample_alg=resample,
             )
@@ -311,16 +223,14 @@ def _read_and_crop_all_bands(item, geojson_cutline: str, vsi_prefix: str,
         for future in as_completed(futures):
             results[futures[future]] = future.result()
     else:
-        # Fallback: sequential reads
         results = {}
         for asset_key, href, resample in band_tasks:
             results[asset_key] = _read_and_crop_band(
-                vsi_prefix, href, geojson_cutline,
+                href, geojson_cutline,
                 target_resolution=target_resolution,
                 resample_alg=resample,
             )
 
-    # Assemble outputs in ARC band order
     bands = []
     geotransform = None
     crs = None
@@ -341,27 +251,18 @@ def _read_and_crop_all_bands(item, geojson_cutline: str, vsi_prefix: str,
 # ---------------------------------------------------------------------------
 
 def _apply_scl_cloud_mask(reflectance: np.ndarray, scl: np.ndarray) -> np.ndarray:
-    """
-    Mask pixels using the Scene Classification Layer (SCL).
-
-    Masked classes: 0=NoData, 1=Saturated, 3=CloudShadow,
-    8=CloudMedium, 9=CloudHigh, 10=Cirrus, 11=Snow
-    """
+    """Mask pixels using the Scene Classification Layer (SCL)."""
     mask = np.isin(scl, list(SCL_MASK_VALUES))
     reflectance[:, mask] = np.nan
     return reflectance
 
 
 def _dn_to_reflectance(dn: np.ndarray, processing_baseline: str) -> np.ndarray:
-    """
-    Convert integer DN values to float32 reflectance [0, 1].
-
-    For processing baseline >= 04.00, applies BOA_ADD_OFFSET of -1000.
-    """
+    """Convert integer DN values to float32 reflectance [0, 1]."""
     try:
         baseline_major = int(processing_baseline.split('.')[0])
     except (ValueError, AttributeError):
-        baseline_major = 5  # default to recent baseline
+        baseline_major = 5
 
     refl = dn.astype(np.float32)
     if baseline_major >= 4:
@@ -378,14 +279,12 @@ def _dn_to_reflectance(dn: np.ndarray, processing_baseline: str) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 def _get_cache_path(item, S2_data_folder: str) -> str:
-    """Return the local cache file path for a STAC item."""
     safe_id = item.id.replace('/', '_').replace('\\', '_')
     return os.path.join(S2_data_folder, f"{safe_id}.npz")
 
 
 def _save_to_cache(cache_path: str, band_data: np.ndarray, scl_data: np.ndarray,
                    geotransform: tuple, crs: str):
-    """Save cropped integer bands + SCL to local cache."""
     np.savez_compressed(
         cache_path,
         band_data=band_data,
@@ -396,7 +295,6 @@ def _save_to_cache(cache_path: str, band_data: np.ndarray, scl_data: np.ndarray,
 
 
 def _load_from_cache(cache_path: str):
-    """Load cached band data."""
     f = np.load(cache_path, allow_pickle=True)
     return (
         f['band_data'],
@@ -410,30 +308,21 @@ def _load_from_cache(cache_path: str):
 # Per-item processing
 # ---------------------------------------------------------------------------
 
-def _process_item(item, geojson_cutline: str, vsi_prefix: str,
-                  S2_data_folder: str,
+def _process_item(item, geojson_cutline: str, S2_data_folder: str,
                   band_executor: ThreadPoolExecutor = None) -> Tuple[np.ndarray, tuple, str]:
-    """
-    Process a single STAC item: read bands (from cache or remote),
-    convert to reflectance, apply cloud mask.
-
-    Returns:
-        reflectance: (10, H, W) float32 with NaN for masked pixels
-        geotransform: 6-tuple
-        crs: WKT string
-    """
+    """Process a single STAC item: read bands, convert to reflectance, apply cloud mask."""
     cache_path = _get_cache_path(item, S2_data_folder)
 
     if os.path.exists(cache_path):
         band_data, scl_data, geotransform, crs = _load_from_cache(cache_path)
     else:
         band_data, scl_data, geotransform, crs = _read_and_crop_all_bands(
-            item, geojson_cutline, vsi_prefix,
+            item, geojson_cutline,
             band_executor=band_executor,
         )
         _save_to_cache(cache_path, band_data, scl_data, geotransform, crs)
 
-    processing_baseline = item.properties.get('processing:version', '05.00')
+    processing_baseline = item.properties.get('s2:processing_baseline', '05.00')
     reflectance = _dn_to_reflectance(band_data, processing_baseline)
     reflectance = _apply_scl_cloud_mask(reflectance, scl_data)
 
@@ -447,10 +336,10 @@ def _process_item(item, geojson_cutline: str, vsi_prefix: str,
 def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
                          S2_data_folder: str = './') -> tuple:
     """
-    Get Sentinel-2 L2A data from the CDSE STAC API.
+    Get Sentinel-2 L2A data from AWS Earth Search (Element 84).
 
-    This function provides the exact same interface as the GEE-based
-    get_s2_official_data() in s2_data_reader.py.
+    No authentication required. Data served as Cloud Optimized GeoTIFFs
+    from the AWS Registry of Open Data.
 
     Args:
         start_date: Start date in 'YYYY-MM-DD' format.
@@ -460,19 +349,10 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
 
     Returns:
         tuple: (s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs)
-            - s2_refs: (N_images, 10, H, W) float32 reflectance [0,1]
-            - s2_uncs: (N_images, 10, H, W) float32 uncertainties (10%)
-            - s2_angles: (3, N_images) float64 [SZA, VZA, RAA] degrees
-            - doys: (N_images,) int64 day of year
-            - mask: (H, W) bool, True where all-NaN
-            - geotransform: 6-tuple GDAL geotransform
-            - crs: WKT projection string
     """
     try:
-        # Configure GDAL for CDSE access
-        vsi_prefix = _configure_gdal_for_cdse()
+        _configure_gdal_for_aws()
 
-        # Load geometry
         geometry = _load_geojson(geojson_path)
         centroid = geometry.centroid
         geojson_dict = json.loads(shapely.to_geojson(geometry))
@@ -481,21 +361,23 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
 
         # Search STAC
         items = _search_s2_collection(geojson_dict, start_date, end_date)
-        print(f"STAC search: {len(items)} items found")
+        print(f"STAC search (AWS): {len(items)} items found")
 
         # Filter to single MGRS tile
         items = _filter_to_single_mgrs_tile(items, centroid.x, centroid.y)
 
         if not items:
             raise RuntimeError(
-                f"No Sentinel-2 L2A items found on CDSE for the given field "
-                f"and date range ({start_date} to {end_date})."
+                f"No Sentinel-2 L2A items found on AWS Earth Search for the given "
+                f"field and date range ({start_date} to {end_date})."
             )
 
-        tile_code = items[0].properties.get("grid:code", "unknown")
+        tile_code = items[0].properties.get(
+            "grid:code",
+            items[0].properties.get("s2:mgrs_tile", "unknown")
+        )
         print(f"Filtered to {len(items)} items on tile {tile_code}")
 
-        # Sort by datetime
         items.sort(key=lambda x: x.datetime)
 
         # Extract angles and DOYs
@@ -520,17 +402,13 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
         print(f"Cache: {n_cached}/{len(items)} items cached, "
               f"{n_to_download} to download")
 
-        # Read and process bands with global connection pooling.
-        # Band-level executor: threads that do actual GDAL reads, gated by semaphore.
-        # Item-level executor: lightweight threads that submit band reads and wait.
-        # This avoids deadlock (item threads never compete with band threads).
-        band_pool_size = _CDSE_MAX_CONCURRENT_READS + 4
+        # Process items with concurrent band reads
+        band_pool_size = _AWS_MAX_CONCURRENT_READS + 4
 
         with ThreadPoolExecutor(max_workers=band_pool_size) as band_executor:
             process_fn = partial(
                 _process_item,
                 geojson_cutline=geojson_cutline,
-                vsi_prefix=vsi_prefix,
                 S2_data_folder=S2_data_folder,
                 band_executor=band_executor,
             )
@@ -543,7 +421,7 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
                 for future in tqdm(
                     as_completed(future_to_idx),
                     total=len(items),
-                    desc="Processing S2 items",
+                    desc="Processing S2 items (AWS)",
                     unit="item",
                 ):
                     idx = future_to_idx[future]
@@ -560,15 +438,11 @@ def get_s2_official_data(start_date: str, end_date: str, geojson_path: str,
 
         s2_refs = np.array(s2_reflectances, dtype=np.float32)
         s2_uncs = np.abs(s2_refs) * 0.1
-
-        # Compute mask: True where ALL time steps and bands are NaN
         mask = np.all(np.isnan(s2_refs), axis=(0, 1))
 
         return s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs
 
-    except EnvironmentError:
-        raise
     except Exception as e:
         raise RuntimeError(
-            "An error occurred while retrieving Sentinel-2 data from CDSE."
+            "An error occurred while retrieving Sentinel-2 data from AWS Earth Search."
         ) from e

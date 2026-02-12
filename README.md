@@ -31,7 +31,14 @@ pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 
 ## Data Sources
 
-ARC supports two data sources for Sentinel-2 imagery. **CDSE is the default**.
+ARC supports four data sources for Sentinel-2 imagery. **CDSE is the default**.
+
+| Source | `data_source=` | Format | Auth Required | Speed |
+|--------|----------------|--------|---------------|-------|
+| CDSE | `'cdse'` (default) | JP2 | S3 keys or login | Moderate |
+| AWS Earth Search | `'aws'` | COG | None | Fast |
+| Planetary Computer | `'planetary'` | COG | Auto (pip package) | Fast |
+| Google Earth Engine | `'gee'` | GeoTIFF | GEE account | Fast |
 
 ### Option A: CDSE (Copernicus Data Space Ecosystem) — Default
 
@@ -61,7 +68,31 @@ export CDSE_USERNAME="your-email@example.com"
 export CDSE_PASSWORD="your-password"
 ```
 
-### Option B: Google Earth Engine (GEE) — Alternative
+### Option B: AWS Earth Search — No Auth Required
+
+[Element 84 Earth Search](https://earth-search.aws.element84.com/v1) provides Sentinel-2 L2A as **Cloud Optimized GeoTIFFs** on AWS. No account or credentials needed.
+
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ..., data_source='aws'
+)
+```
+
+### Option C: Microsoft Planetary Computer
+
+[Planetary Computer](https://planetarycomputer.microsoft.com/) provides Sentinel-2 L2A as COGs on Azure. Authentication is handled automatically by the `planetary-computer` package.
+
+```bash
+pip install planetary-computer
+```
+
+```python
+scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
+    ..., data_source='planetary'
+)
+```
+
+### Option D: Google Earth Engine (GEE)
 
 Use `data_source='gee'` when calling `arc_field()`. Requires GEE authentication:
 
