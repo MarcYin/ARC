@@ -25,7 +25,7 @@
 
 ARC is a Python package for estimating crop biophysical parameters from Sentinel-2 satellite imagery. It works by:
 
-1. Downloading Sentinel-2 surface reflectance data from the Copernicus Data Space Ecosystem (CDSE) or Google Earth Engine (GEE) for a user-defined field boundary and date range.
+1. Downloading Sentinel-2 surface reflectance data via the [eof](https://github.com/profLewis/eof) (EO Fetch) package, which supports AWS Earth Search, CDSE, Planetary Computer, and Google Earth Engine.
 2. Generating a large ensemble of simulated Sentinel-2 reflectance spectra using a neural network emulator of the PROSAIL radiative transfer model, spanning a range of crop biophysical states, phenologies, soil backgrounds, and viewing geometries.
 3. Matching the observed satellite spectra to the closest members of this simulated ensemble using approximate nearest-neighbour search.
 4. Computing weighted-average posterior estimates of biophysical parameters (and their uncertainties) from the best-matching ensemble members.
@@ -96,11 +96,10 @@ User Input
 
         ↓
 
-[Step 1] Sentinel-2 Data Retrieval (s2_data_reader.py)
+[Step 1] Sentinel-2 Data Retrieval (via eof package)
   ├── Load GeoJSON → compute centroid → MGRS tile
-  ├── Query Google Earth Engine (S2_SR_HARMONIZED collection)
-  ├── Download images with cloud probability & cloud score+
-  ├── Crop to field boundary, apply cloud mask (probability <70)
+  ├── Query data source (AWS, CDSE, Planetary Computer, or GEE)
+  ├── Download images, crop to field boundary, apply cloud mask
   └── Output: s2_refs (10 bands × dates × pixels), uncertainties (10%), angles
 
         ↓
@@ -169,7 +168,7 @@ Exports the two main entry points:
 **Function: `arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season, crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False, data_source='cdse')`**
 
 Orchestrates the full pipeline by calling, in sequence:
-1. `get_s2_official_data()` — download and preprocess satellite data (from CDSE or GEE)
+1. `eof.get_s2_official_data()` — download and preprocess satellite data (via [eof](https://github.com/profLewis/eof) package)
 2. `generate_arc_refs()` — create the archetype ensemble
 3. `get_neighbours()` — find nearest neighbours
 4. `assimilate()` — compute posterior parameter estimates
@@ -183,9 +182,9 @@ Orchestrates the full pipeline by calling, in sequence:
 - `output_file_path`: Where to save the `.npz` output file
 - `num_samples`: Ensemble size (default 10,000; 100,000 recommended for production)
 - `growth_season_length`: Duration of the active growing season in days
-- `S2_data_folder`: Local cache directory for downloaded GeoTIFFs
+- `S2_data_folder`: Local cache directory for downloaded data
 - `plot`: If `True`, generates diagnostic plots of spectral fits for 10 random pixels
-- `data_source`: `'cdse'` (default) or `'gee'`. CDSE uses the Copernicus Data Space Ecosystem STAC API; GEE uses Google Earth Engine.
+- `data_source`: `'aws'`, `'cdse'`, `'planetary'`, `'gee'`, or `'auto'` (picks fastest available). Default: `'cdse'`.
 
 **Returns:** `(scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys)`
 
@@ -274,61 +273,24 @@ This is the core scientific module. It generates a large ensemble of plausible c
 
 ---
 
-### 4.4 `arc/s2_data_reader.py` — Sentinel-2 Data Retrieval
+### 4.4 Sentinel-2 Data Retrieval (via `eof` package)
 
-Handles all interaction with Google Earth Engine to download and preprocess Sentinel-2 data.
+Sentinel-2 data retrieval is handled by the separate [eof](https://github.com/profLewis/eof) (EO Fetch) package, which ARC uses as a dependency.
 
-**Main Function: `get_s2_official_data(start_date, end_date, geojson_path, S2_data_folder)`**
+**Supported data sources:**
 
-**Pipeline:**
-1. `load_geojson()` → loads field boundary from GeoJSON, fixes invalid geometries with `.buffer(0)`
-2. `get_geometry_and_centroid()` → computes field centroid
-3. `convert_geometry_to_ee_and_mgrs()` → converts geometry to Earth Engine format and computes MGRS tile code for image filtering
-4. `filter_s2_collection()` → queries `COPERNICUS/S2_SR_HARMONIZED` collection, filtered by bounds, date, and MGRS tile
-5. `calculate_s2_angles()` → extracts solar/view geometry (SZA, VZA, RAA) from image metadata, averaging across all 10 bands for view angles
-6. `get_doys()` → extracts day-of-year from S2 product IDs
-7. `download_images()` → downloads GeoTIFFs concurrently using `ThreadPoolExecutor`
-8. `read_s2_official_data()` → reads downloaded files with GDAL, crops to field boundary, applies cloud masking, converts to reflectance
+| Source | `data_source=` | Auth Required |
+|--------|----------------|---------------|
+| [AWS Earth Search](https://earth-search.aws.element84.com/v1) | `'aws'` | None |
+| [CDSE](https://dataspace.copernicus.eu) | `'cdse'` | [S3 keys](https://eodata.dataspace.copernicus.eu) or login |
+| [Planetary Computer](https://planetarycomputer.microsoft.com/) | `'planetary'` | `pip install planetary-computer` |
+| [Google Earth Engine](https://earthengine.google.com/) | `'gee'` | [GEE account](https://signup.earthengine.google.com/) |
 
-**Cloud Masking:**
-Each image is downloaded with 14 bands: 10 S2 spectral bands + cloud probability + cloud score + cloud score CDF + B10 (cirrus). A pixel is masked if:
-- Cloud probability >= 70, OR
-- B2 reflectance > 3000 (saturation), OR
-- B10 (cirrus) > 100
-
-Uncertainties are assumed to be 10% of the reflectance value.
+Using `data_source='auto'` picks the first available source from the user's preference list (defaults to AWS).
 
 **Returns:** `(s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs)`
 
----
-
-### 4.4b `arc/s2_cdse_reader.py` — Sentinel-2 Data Retrieval via CDSE (Default)
-
-Alternative data reader that retrieves Sentinel-2 L2A data from the Copernicus Data Space Ecosystem (CDSE) STAC API. **This is the default data source.**
-
-**Main Function: `get_s2_official_data(start_date, end_date, geojson_path, S2_data_folder)`**
-
-Returns the exact same 7-tuple interface as the GEE reader.
-
-**Pipeline:**
-1. Configure GDAL for CDSE S3 access (credentials from environment variables)
-2. Load GeoJSON and compute centroid
-3. Search CDSE STAC catalogue (`sentinel-2-l2a` collection) with polygon intersection
-4. Filter to single MGRS tile based on field centroid
-5. For each STAC item: read 10 spectral bands + SCL via GDAL `/vsis3/` or `/vsicurl/`
-6. Convert integer DN to reflectance (handling processing baseline offset for >= 04.00)
-7. Apply SCL-based cloud mask
-
-**Key Differences from GEE Reader:**
-- **Cloud masking**: Uses Scene Classification Layer (SCL) instead of Cloud Score+. Masked classes: 0 (NoData), 1 (Saturated), 3 (Cloud Shadow), 8 (Cloud Medium), 9 (Cloud High), 10 (Cirrus), 11 (Snow).
-- **Reflectance offset**: For processing baseline >= 04.00, applies `(DN - 1000) / 10000` (GEE S2_SR_HARMONIZED already handles this).
-- **Viewing geometry**: Uses scene-level means from STAC properties (`view:sun_elevation`, `view:incidence_angle`, etc.) rather than per-band metadata averages.
-- **Data transfer**: Reads band data as Int16 integers and converts locally, halving network transfer.
-- **Authentication**: Requires CDSE credentials (S3 keys or username/password) via environment variables.
-
-**Authentication Options:**
-1. S3 keys: `CDSE_S3_ACCESS_KEY` + `CDSE_S3_SECRET_KEY` (preferred)
-2. Username/password: `CDSE_USERNAME` + `CDSE_PASSWORD` (fallback)
+See the [eof documentation](https://github.com/profLewis/eof#readme) for full details on credential setup, caching, and the S2Result dataclass.
 
 ---
 
@@ -568,14 +530,9 @@ This gives higher weight to ensemble members that match better, and incorporates
 | `numpy` | Core array operations |
 | `scipy` | Optimization (`least_squares`), quasi-random sampling (`Sobol`), LAPACK solvers |
 | `tqdm` | Progress bars for batch processing |
-| `mgrs` | Convert lat/lon to Military Grid Reference System tiles |
-| `gdal` (osgeo) | Geospatial raster I/O and reprojection |
 | `numba` | JIT compilation of the custom distance metric |
-| `shapely` | Geometric operations on field boundaries |
-| `requests` | HTTP download of GeoTIFF images from Earth Engine / CDSE token auth |
 | `pynndescent` | Approximate nearest neighbour search with custom metrics |
-| `pystac-client` | STAC API client for CDSE catalogue search |
-| `earthengine-api` | Google Earth Engine Python API (only imported when `data_source='gee'`) |
+| `eof` | Sentinel-2 data retrieval from multiple sources (AWS, CDSE, Planetary Computer, GEE) |
 
 ---
 
@@ -584,15 +541,12 @@ This gives higher weight to ensemble members that match better, and incorporates
 ### 8.1 Installation
 
 ```bash
-pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
+pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 ```
 
 ### 8.2 Prerequisites
 
-Google Earth Engine authentication is required:
-```bash
-earthengine authenticate --auth_mode=notebook
-```
+No authentication is needed for the default AWS data source. For other sources, see the [eof credential setup guide](https://github.com/profLewis/eof#credential-management).
 
 ### 8.3 Generating an Archetype Ensemble (without satellite data)
 
@@ -631,7 +585,8 @@ scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys = arc.arc_field(
     output_file_path="output.npz",
     num_samples=100000,
     growth_season_length=45,
-    S2_data_folder="./S2_data"
+    S2_data_folder="./S2_data",
+    data_source='auto',  # or 'aws', 'cdse', 'planetary', 'gee'
 )
 
 # Extract LAI time series (physical units)
