@@ -24,10 +24,15 @@ def _get_data_reader(data_source):
     elif data_source == 'planetary':
         from arc.s2_planetary_reader import get_s2_official_data
         return get_s2_official_data
+    elif data_source == 'auto':
+        from arc.credentials import select_data_source
+        resolved = select_data_source()
+        print(f"Auto-selected data source: {resolved}")
+        return _get_data_reader(resolved)
     else:
         raise ValueError(
             f"Unknown data_source '{data_source}'. "
-            f"Must be 'cdse', 'gee', 'aws', or 'planetary'."
+            f"Must be 'cdse', 'gee', 'aws', 'planetary', or 'auto'."
         )
 
 
@@ -47,7 +52,8 @@ def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
         num_samples : Number of samples to generate (default is 1,000,000).
         growth_season_length : Length of the growth season (default is 45).
         S2_data_folder : Directory where satellite data is stored.
-        data_source : Data source for S2 imagery: 'cdse' (default) or 'gee'.
+        data_source : Data source for S2 imagery: 'cdse', 'gee', 'aws',
+            'planetary', or 'auto' (picks fastest available). Default: 'cdse'.
 
     Returns:
         None. The results are saved to the output_file_path.
