@@ -165,7 +165,7 @@ Exports the two main entry points:
 
 ### 4.2 `arc/field_processor.py` — Pipeline Orchestrator
 
-**Function: `arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season, crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False, data_source='cdse')`**
+**Function: `arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season, crop_type, output_file_path, num_samples=10000, growth_season_length=45, S2_data_folder='./S2_data', plot=False, data_source='aws')`**
 
 Orchestrates the full pipeline by calling, in sequence:
 1. `eof.get_s2_data()` — download and preprocess satellite data (via [eof](https://github.com/profLewis/eof) package)
@@ -184,7 +184,7 @@ Orchestrates the full pipeline by calling, in sequence:
 - `growth_season_length`: Duration of the active growing season in days
 - `S2_data_folder`: Local cache directory for downloaded data
 - `plot`: If `True`, generates diagnostic plots of spectral fits for 10 random pixels
-- `data_source`: `'aws'`, `'cdse'`, `'planetary'`, `'gee'`, or `'auto'` (picks fastest available). Default: `'cdse'`.
+- `data_source`: `'aws'`, `'cdse'`, `'planetary'`, `'gee'`, or `'auto'` (picks fastest available). Default: `'aws'`.
 
 **Returns:** `(scale_data, post_bio_tensor, post_bio_unc_tensor, mask, doys)`
 
@@ -548,7 +548,7 @@ pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 
 ### 8.2 Prerequisites
 
-No authentication is needed for the default AWS data source. For other sources, see the [eof credential setup guide](https://github.com/profLewis/eof#credential-management).
+No authentication is needed for the default AWS data source (free, fast). For other sources, see the [eof credential setup guide](https://github.com/profLewis/eof#credential-management).
 
 ### 8.3 Generating an Archetype Ensemble (without satellite data)
 

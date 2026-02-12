@@ -24,7 +24,7 @@ def _get_data_reader(data_source):
 
 def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
               crop_type, output_file_path, num_samples=10000, growth_season_length=45,
-              S2_data_folder='./S2_data', plot=False, data_source='cdse'):
+              S2_data_folder='./S2_data', plot=False, data_source='aws'):
     """
     Performs the ARC Field pipeline which includes reading satellite data, generating samples, searching for neighbours,
     assimilating data, and saving the resulting data.
@@ -38,8 +38,8 @@ def arc_field(s2_start_date, s2_end_date, geojson_path, start_of_season,
         num_samples : Number of samples to generate (default is 1,000,000).
         growth_season_length : Length of the growth season (default is 45).
         S2_data_folder : Directory where satellite data is stored.
-        data_source : Data source for S2 imagery: 'cdse', 'gee', 'aws',
-            'planetary', or 'auto' (picks fastest available). Default: 'cdse'.
+        data_source : Data source for S2 imagery: 'aws', 'cdse', 'planetary',
+            'gee', or 'auto' (picks fastest available). Default: 'aws'.
 
     Returns:
         None. The results are saved to the output_file_path.
