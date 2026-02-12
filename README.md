@@ -19,14 +19,14 @@ This work is part of the [BIG data Archetypes for Crops from EO](https://www.eoa
 ![Wits](https://www.wits.ac.za/media/wits-university-style-assets/images/Wits_Centenary_Logo_Large.svg)
 
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/MarcYin/ARC/blob/main/notebooks/test_cdse.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb)
 
 ## Installation
 
 To install this Python package, you can run the following command:
 
 ```
-pip install https://github.com/MarcYin/ARC/archive/refs/heads/main.zip
+pip install https://github.com/profLewis/ARC/archive/refs/heads/main.zip
 ```
 
 ## Data Sources
@@ -161,9 +161,9 @@ The shape of `post_bio_tensor` should be (number_doys, 7, number_valid_pixels), 
 
 ### Full example:
 
-You can try this interactively using the [Colab notebook](https://colab.research.google.com/github/MarcYin/ARC/blob/main/notebooks/test_cdse.ipynb).
+You can try this interactively using the [Colab notebook](https://colab.research.google.com/github/profLewis/ARC/blob/main/notebooks/test_cdse.ipynb).
 
-Make sure you have set up credentials for your chosen data source (see [Data Sources](#data-sources) above), then run the following to test the solver over one [South African field](https://github.com/MarcYin/ARC/blob/main/arc/test_data/SF_field.geojson):
+Make sure you have set up credentials for your chosen data source (see [Data Sources](#data-sources) above), then run the following to test the solver over one [South African field](https://github.com/profLewis/ARC/blob/main/arc/test_data/SF_field.geojson):
 
 
 ```python
