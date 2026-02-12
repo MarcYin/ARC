@@ -25,7 +25,7 @@
 
 ARC is a Python package for estimating crop biophysical parameters from Sentinel-2 satellite imagery. It works by:
 
-1. Downloading Sentinel-2 surface reflectance data via the [eof](https://github.com/profLewis/eof) (EO Fetch) package, which supports AWS Earth Search, CDSE, Planetary Computer, and Google Earth Engine.
+1. Downloading Sentinel-2 surface reflectance data via the [eof](https://github.com/profLewis/eof) (EO Fetch) package, which supports multiple sensors (Sentinel-2, Landsat, MODIS, VIIRS, Sentinel-3 OLCI) from multiple platforms (AWS Earth Search, CDSE, Planetary Computer, Google Earth Engine).
 2. Generating a large ensemble of simulated Sentinel-2 reflectance spectra using a neural network emulator of the PROSAIL radiative transfer model, spanning a range of crop biophysical states, phenologies, soil backgrounds, and viewing geometries.
 3. Matching the observed satellite spectra to the closest members of this simulated ensemble using approximate nearest-neighbour search.
 4. Computing weighted-average posterior estimates of biophysical parameters (and their uncertainties) from the best-matching ensemble members.
@@ -273,24 +273,26 @@ This is the core scientific module. It generates a large ensemble of plausible c
 
 ---
 
-### 4.4 Sentinel-2 Data Retrieval (via `eof` package)
+### 4.4 EO Data Retrieval (via `eof` package)
 
-Sentinel-2 data retrieval is handled by the separate [eof](https://github.com/profLewis/eof) (EO Fetch) package, which ARC uses as a dependency.
+Earth Observation data retrieval is handled by the separate [eof](https://github.com/profLewis/eof) (EO Fetch) package, which ARC uses as a dependency.
 
-**Supported data sources:**
+**Supported sensors:** Sentinel-2, Landsat 8/9, MODIS, VIIRS, Sentinel-3 OLCI
 
-| Source | `data_source=` | Auth Required |
-|--------|----------------|---------------|
+**Supported platforms:**
+
+| Platform | `data_source=` | Auth Required |
+|----------|----------------|---------------|
 | [AWS Earth Search](https://earth-search.aws.element84.com/v1) | `'aws'` | None |
 | [CDSE](https://dataspace.copernicus.eu) | `'cdse'` | [S3 keys](https://eodata.dataspace.copernicus.eu) or login |
 | [Planetary Computer](https://planetarycomputer.microsoft.com/) | `'planetary'` | `pip install planetary-computer` |
 | [Google Earth Engine](https://earthengine.google.com/) | `'gee'` | [GEE account](https://signup.earthengine.google.com/) |
 
-Using `data_source='auto'` picks the first available source from the user's preference list (defaults to AWS).
+ARC currently uses `eof.get_s2_official_data()` for Sentinel-2 data. The `eof` package also supports multi-sensor retrieval via `eof.get_eo_data()` which returns data resampled to 10m with footprint ID maps for multi-scale processing.
 
-**Returns:** `(s2_refs, s2_uncs, s2_angles, doys, mask, geotransform, crs)`
+Using `data_source='auto'` picks the first available platform (defaults to AWS).
 
-See the [eof documentation](https://github.com/profLewis/eof#readme) for full details on credential setup, caching, and the S2Result dataclass.
+See the [eof documentation](https://github.com/profLewis/eof#readme) for full details on sensors, credentials, caching, and the API.
 
 ---
 
@@ -532,7 +534,7 @@ This gives higher weight to ensemble members that match better, and incorporates
 | `tqdm` | Progress bars for batch processing |
 | `numba` | JIT compilation of the custom distance metric |
 | `pynndescent` | Approximate nearest neighbour search with custom metrics |
-| `eof` | Sentinel-2 data retrieval from multiple sources (AWS, CDSE, Planetary Computer, GEE) |
+| `eof` | Multi-sensor EO data retrieval (Sentinel-2, Landsat, MODIS, VIIRS, S3 OLCI) from multiple platforms (AWS, CDSE, Planetary Computer, GEE) |
 
 ---
 
