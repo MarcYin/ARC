@@ -36,10 +36,23 @@ def partition_doy(doys, steps=6, overlap=8):
         overlap: Number of overlapping elements between each partition.
 
     Returns:
-        A list of boolean numpy arrays, each representing a partition.
+        A list of boolean numpy arrays, one per non-empty partition window.
+
+    Notes:
+        With sparse DOY coverage (large gaps between observations), some
+        evenly-spaced windows can contain zero DOYs even with the overlap
+        applied. ``partition_data`` then evaluates ``np.nanmedian`` over
+        an empty axis and returns NaN, which downstream poisons the
+        ``pynndescent`` KNN tree:
+            ``ValueError: Input contains NaN``
+        Drop empty windows here so neither ``partition_data`` nor the
+        ``mean_band_errs = np.repeat(..., len(parts))`` weight vector
+        in ``get_neighbours`` sees them. Both adapt to the new
+        ``len(parts)`` automatically.
     """
     nodes = np.linspace(doys[0], doys[-1], steps + 1)
-    return [(doys >= start - overlap) & (doys <= end + overlap) for start, end in zip(nodes[:-1], nodes[1:])]
+    parts = [(doys >= start - overlap) & (doys <= end + overlap) for start, end in zip(nodes[:-1], nodes[1:])]
+    return [part for part in parts if part.any()]
 
 
 def partition_data(parts, data):
