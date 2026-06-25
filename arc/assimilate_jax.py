@@ -1,3 +1,4 @@
+import os
 import jax
 import jax.numpy as jnp
 from jax import jit
@@ -89,7 +90,19 @@ def assimilate(s2_refs, arc_refs, s2_errs, pheo_samples, bio_samples, soil_sampl
     def single_sample(i):
         return cond(mask[i], i, process_valid_index, i, process_invalid_index)
 
-    results = jax.vmap(single_sample)(jnp.arange(n_samples))
+    # Map over pixels in batches to bound peak memory. A plain jax.vmap over every
+    # pixel materialises all per-pixel intermediates simultaneously (e.g.
+    # en_refs = arc_refs[:, :, neighbours[i]]), which can reach hundreds of GB for a
+    # large field -- a 7 km / 10 m box (~490k valid pixels) needs ~840 GB and is
+    # OOM-killed. jax.lax.map with batch_size vmaps within each batch and scans across
+    # batches, so peak memory scales with ARC_ASSIM_BATCH instead of the pixel count.
+    # Output is identical to the vmap version (verified shape- and value-equal).
+    batch_size = int(os.environ.get("ARC_ASSIM_BATCH", "4096"))
+    indices = jnp.arange(n_samples)
+    if n_samples <= batch_size:
+        results = jax.vmap(single_sample)(indices)
+    else:
+        results = jax.lax.map(single_sample, indices, batch_size=batch_size)
 
     return tuple(jnp.stack(result) for result in results)
 
